@@ -20,7 +20,19 @@
     "example_1_mutations": "- Mutations: D614G, A222V, T478K",
     "example_2": "**Example 2:** Human p53",
     "example_2_uniprot": "- UniProt ID: P04637",
-    "example_2_mutations": "- Mutations: R175H, R248Q, R273H"
+    "example_2_mutations": "- Mutations: R175H, R248Q, R273H",
+    "example_3": "**Example 3:** Human Hemoglobin Beta Chain",
+    "example_3_uniprot": "- UniProt ID: P68871",
+    "example_3_mutations": "- Mutations: E6V, D73H",
+    "example_4": "**Example 4:** Human Preproinsulin",
+    "example_4_uniprot": "- UniProt ID: P01308",
+    "example_4_mutations": "- Mutations: R34Q, R68C",
+    "example_5": "**Example 5:** E. coli Lactose Repressor",
+    "example_5_uniprot": "- UniProt ID: P03023",
+    "example_5_mutations": "- Mutations: G46A, S61L",
+    "example_6": "**Example 6:** Human EGFR",
+    "example_6_uniprot": "- UniProt ID: P00533",
+    "example_6_mutations": "- Mutations: L858R, T790M"
   },
   "main": {
     "results": "Results",

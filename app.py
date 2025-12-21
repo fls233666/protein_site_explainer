@@ -876,5 +876,21 @@ st.sidebar.markdown(
     "\n" \
     f"{translations['sidebar']['example_2']}\n" \
     f"{translations['sidebar']['example_2_uniprot']}\n" \
-    f"{translations['sidebar']['example_2_mutations']}\n"
+    f"{translations['sidebar']['example_2_mutations']}\n" \
+    "\n" \
+    f"{translations['sidebar']['example_3']}\n" \
+    f"{translations['sidebar']['example_3_uniprot']}\n" \
+    f"{translations['sidebar']['example_3_mutations']}\n" \
+    "\n" \
+    f"{translations['sidebar']['example_4']}\n" \
+    f"{translations['sidebar']['example_4_uniprot']}\n" \
+    f"{translations['sidebar']['example_4_mutations']}\n" \
+    "\n" \
+    f"{translations['sidebar']['example_5']}\n" \
+    f"{translations['sidebar']['example_5_uniprot']}\n" \
+    f"{translations['sidebar']['example_5_mutations']}\n" \
+    "\n" \
+    f"{translations['sidebar']['example_6']}\n" \
+    f"{translations['sidebar']['example_6_uniprot']}\n" \
+    f"{translations['sidebar']['example_6_mutations']}\n"
 )

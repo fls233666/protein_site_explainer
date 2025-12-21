@@ -190,6 +190,26 @@ python -m streamlit run app.py
 - **UniProt ID**: `P04637`
 - **Mutations**: `R175H, R248Q, R273H`
 
+### 示例 3：人类血红蛋白β链
+
+- **UniProt ID**: `P68871`
+- **Mutations**: `E6V, D73H`
+
+### 示例 4：人类前胰岛素原
+
+- **UniProt ID**: `P01308`
+- **Mutations**: `R34Q, R68C`
+
+### 示例 5：大肠杆菌乳糖阻遏蛋白
+
+- **UniProt ID**: `P03023`
+- **Mutations**: `G46A, S61L`
+
+### 示例 6：人类EGFR
+
+- **UniProt ID**: `P00533`
+- **Mutations**: `L858R, T790M`
+
 ## 项目结构
 
 ```
