@@ -157,5 +157,5 @@ MIT License
 
 如有问题或建议，请通过以下方式联系：
 
-- Email: <your-email@example.com>
-- GitHub: <repository-url>
+- Email: <1300311091@qq.com>
+- GitHub: <https://github.com/fls233666/protein_site_explainer>
