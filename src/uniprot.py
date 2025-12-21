@@ -1,10 +1,56 @@
 import requests
 import xml.etree.ElementTree as ET
 from datetime import timedelta
+from urllib.parse import urlparse
+import time
 from .cache import disk_cache
 
 # UniProt REST API端点
 UNIPROT_API_URL = "https://rest.uniprot.org/uniprotkb/{}.xml"
+
+# 创建统一的requests.Session对象，用于所有网络请求
+def create_session(timeout=30, max_retries=3, backoff_factor=0.5):
+    """创建带超时、重试和指数退避的requests.Session
+    
+    Args:
+        timeout: 请求超时时间（秒）
+        max_retries: 最大重试次数
+        backoff_factor: 指数退避因子
+    
+    Returns:
+        requests.Session: 配置好的Session对象
+    """
+    session = requests.Session()
+    
+    # 设置默认超时
+    session.timeout = timeout
+    
+    # 设置User-Agent
+    session.headers.update({
+        "User-Agent": "ProteinSiteExplainer/1.0 (+https://github.com/yourusername/protein_site_explainer)"
+    })
+    
+    # 添加重试策略
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+    
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "HEAD"]  # 只对GET和HEAD请求重试
+    )
+    
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    
+    # 为所有HTTP和HTTPS请求添加适配器
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    return session
+
+# 创建全局Session对象
+_session = create_session()
 
 class UniProtEntry:
     """UniProt条目数据类"""
@@ -46,11 +92,26 @@ def get_uniprot_entry(uniprot_id):
 def _fetch_uniprot_data(uniprot_id):
     """从UniProt API获取数据（私有函数，带缓存）"""
     url = UNIPROT_API_URL.format(uniprot_id)
-    response = requests.get(url)
-    response.raise_for_status()  # 检查请求是否成功
+    
+    try:
+        response = _session.get(url)
+        response.raise_for_status()  # 检查请求是否成功
+    except requests.exceptions.HTTPError as e:
+        # 处理特定错误
+        if response.status_code == 429:
+            raise requests.exceptions.HTTPError(f"Too many requests to UniProt API for ID {uniprot_id}. Please try again later.")
+        elif response.status_code == 404:
+            raise requests.exceptions.HTTPError(f"UniProt ID {uniprot_id} not found.")
+        else:
+            raise requests.exceptions.HTTPError(f"Failed to fetch UniProt data for ID {uniprot_id}: HTTP {response.status_code} - {response.reason}")
+    except requests.exceptions.RequestException as e:
+        raise requests.exceptions.RequestException(f"Network error when fetching UniProt data for ID {uniprot_id}: {str(e)}")
     
     # 解析XML响应
-    root = ET.fromstring(response.content)
+    try:
+        root = ET.fromstring(response.content)
+    except ET.ParseError as e:
+        raise ValueError(f"Failed to parse UniProt XML response for ID {uniprot_id}: {str(e)}")
     
     # 命名空间
     ns = {
@@ -58,12 +119,20 @@ def _fetch_uniprot_data(uniprot_id):
         "xsi": "http://www.w3.org/2001/XMLSchema-instance"
     }
     
-    # 提取序列
-    sequence_elem = root.find(".//uniprot:sequence", ns)
-    if sequence_elem is None:
-        raise ValueError(f"No sequence found for UniProt ID: {uniprot_id}")
+    # 提取序列 - 查找所有序列元素并选择包含有效文本的元素
+    sequence_elements = root.findall(".//uniprot:sequence", ns)
+    if not sequence_elements:
+        raise ValueError(f"No sequence elements found for UniProt ID: {uniprot_id}")
     
-    sequence = sequence_elem.text.strip()
+    sequence = ""
+    for seq_elem in sequence_elements:
+        if seq_elem.text is not None:
+            sequence = seq_elem.text.strip()
+            if sequence:
+                break  # 找到第一个非空序列就返回
+    
+    if not sequence:
+        raise ValueError(f"Empty sequence found for UniProt ID: {uniprot_id}")
     
     # 提取特征
     features = []
@@ -72,18 +141,32 @@ def _fetch_uniprot_data(uniprot_id):
         if not feature_type:
             continue
         
-        # 获取位置信息
-        location_elem = feature_elem.find(".//uniprot:location/uniprot:begin", ns)
-        end_elem = feature_elem.find(".//uniprot:location/uniprot:end", ns)
-        
-        if location_elem is None or end_elem is None:
+        # 获取位置信息 - 兼容begin/end和position两种格式
+        location_elem = feature_elem.find(".//uniprot:location", ns)
+        if location_elem is None:
             continue
         
-        try:
-            start = int(location_elem.attrib.get("position", "0"))
-            end = int(end_elem.attrib.get("position", "0"))
-        except ValueError:
-            continue
+        # 尝试获取begin和end元素
+        begin_elem = location_elem.find(".//uniprot:begin", ns)
+        end_elem = location_elem.find(".//uniprot:end", ns)
+        
+        start = end = 0
+        
+        # 处理begin/end格式
+        if begin_elem is not None and end_elem is not None:
+            try:
+                start = int(begin_elem.attrib.get("position", "0"))
+                end = int(end_elem.attrib.get("position", "0"))
+            except ValueError:
+                continue
+        # 处理单个position格式
+        else:
+            position_elem = location_elem.find(".//uniprot:position", ns)
+            if position_elem is not None:
+                try:
+                    start = end = int(position_elem.attrib.get("position", "0"))
+                except ValueError:
+                    continue
         
         if start <= 0 or end <= 0:
             continue

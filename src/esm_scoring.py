@@ -3,18 +3,19 @@ import esm
 import numpy as np
 from .cache import disk_cache
 from datetime import timedelta
+import streamlit as st
 
-# 氨基酸字母表（ESM模型使用的顺序）
-AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
-AA_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
+# 标准氨基酸字母表
+STANDARD_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 class ESMScorer:
     """ESM评分器类"""
-    def __init__(self, model_name="esm2_t6_8M_UR50D"):
+    def __init__(self, model_name="esm2_t6_8M_UR50D", device=None):
         self.model_name = model_name
         self.model = None
         self.alphabet = None
         self.batch_converter = None
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.load_model()
     
     def load_model(self):
@@ -24,8 +25,15 @@ class ESMScorer:
             model_func = getattr(esm.pretrained, self.model_name)
             self.model, self.alphabet = model_func()
             self.model.eval()
-            if torch.cuda.is_available():
-                self.model = self.model.cuda()
+            try:
+                self.model = self.model.to(self.device)
+            except RuntimeError as e:
+                if "out of memory" in str(e):
+                    print(f"CUDA out of memory, falling back to CPU")
+                    self.device = "cpu"
+                    self.model = self.model.to(self.device)
+                else:
+                    raise e
             self.batch_converter = self.alphabet.get_batch_converter()
     
     @torch.no_grad()
@@ -33,25 +41,49 @@ class ESMScorer:
         """获取序列的logits
         
         Args:
-            sequence: 蛋白质序列字符串
+            sequence: 蛋白质序列字符串，允许包含<mask>标记
             
         Returns:
-            numpy array: 形状为 (sequence_length, num_amino_acids) 的logits矩阵
+            numpy array: 形状为 (sequence_length, num_tokens) 的logits矩阵
         """
+        # 验证序列（允许<mask>标记）
+        if '<mask>' in sequence:
+            # 分割并验证每个部分
+            parts = sequence.split('<mask>')
+            for part in parts:
+                for aa in part:
+                    if aa not in STANDARD_AMINO_ACIDS:
+                        raise ValueError(f"Non-standard amino acid '{aa}' found in sequence")
+        else:
+            # 没有<mask>，验证整个序列
+            for aa in sequence:
+                if aa not in STANDARD_AMINO_ACIDS:
+                    raise ValueError(f"Non-standard amino acid '{aa}' found in sequence")
+        
         # 准备输入
         data = [("protein", sequence)]
         batch_labels, batch_strs, batch_tokens = self.batch_converter(data)
         
-        if torch.cuda.is_available():
-            batch_tokens = batch_tokens.cuda()
-        
-        # 前向传播
-        results = self.model(batch_tokens, repr_layers=[])
-        logits = results["logits"].cpu().numpy()
+        try:
+            batch_tokens = batch_tokens.to(self.device)
+            # 前向传播
+            results = self.model(batch_tokens, repr_layers=[])
+            logits = results["logits"].detach().cpu().numpy()
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                print(f"CUDA out of memory during inference, falling back to CPU")
+                self.device = "cpu"
+                self.model = self.model.to(self.device)
+                batch_tokens = batch_tokens.to(self.device)
+                results = self.model(batch_tokens, repr_layers=[])
+                logits = results["logits"].detach().cpu().numpy()
+            else:
+                raise e
         
         # 移除起始和结束标记
-        return logits[0, 1:-1, :]  # (seq_len, 21)
+        return logits[0, 1:-1, :]  # (seq_len, num_tokens)
     
+    @torch.no_grad()
     def calculate_llr(self, sequence, position, wt_aa, mut_aa):
         """计算单个突变的LLR
         
@@ -64,6 +96,18 @@ class ESMScorer:
         Returns:
             float: LLR值 (logP(mut) - logP(wt))
         """
+        # 验证氨基酸
+        if wt_aa not in STANDARD_AMINO_ACIDS:
+            raise ValueError(f"Wildtype amino acid '{wt_aa}' is not a standard amino acid")
+        if mut_aa not in STANDARD_AMINO_ACIDS:
+            raise ValueError(f"Mutant amino acid '{mut_aa}' is not a standard amino acid")
+        
+        # 验证序列位置
+        if position < 1 or position > len(sequence):
+            raise ValueError(f"Position {position} is out of sequence bounds (1-{len(sequence)})")
+        if sequence[position - 1] != wt_aa:
+            raise ValueError(f"Sequence at position {position} is '{sequence[position - 1]}', expected wildtype '{wt_aa}'")
+        
         # 创建mask序列
         mask_sequence = list(sequence)
         mask_sequence[position - 1] = self.alphabet.get_tok(self.alphabet.mask_idx)
@@ -73,17 +117,18 @@ class ESMScorer:
         logits = self.get_logits(mask_sequence)
         target_logits = logits[position - 1, :]
         
-        # 转换为概率
-        probs = torch.softmax(torch.tensor(target_logits), dim=0).numpy()
+        # 转换为概率 (使用PyTorch避免numpy<->torch拷贝)
+        probs_tensor = torch.softmax(torch.tensor(target_logits).to(self.device), dim=0)
         
-        # 计算LLR
-        wt_idx = AA_TO_INDEX[wt_aa]
-        mut_idx = AA_TO_INDEX[mut_aa]
+        # 计算LLR，使用ESM alphabet的真实token索引
+        wt_idx = self.alphabet.tok_to_idx[wt_aa]
+        mut_idx = self.alphabet.tok_to_idx[mut_aa]
         
-        llr = np.log(probs[mut_idx] + 1e-10) - np.log(probs[wt_idx] + 1e-10)
+        llr = (torch.log(probs_tensor[mut_idx] + 1e-10) - torch.log(probs_tensor[wt_idx] + 1e-10)).cpu().item()
         
         return llr
     
+    @torch.no_grad()
     def calculate_sensitivity(self, sequence, position, wt_aa, full_length=False):
         """计算位点敏感度
         
@@ -99,6 +144,16 @@ class ESMScorer:
         if full_length:
             raise NotImplementedError("Full length sensitivity calculation not implemented yet")
         
+        # 验证氨基酸
+        if wt_aa not in STANDARD_AMINO_ACIDS:
+            raise ValueError(f"Wildtype amino acid '{wt_aa}' is not a standard amino acid")
+        
+        # 验证序列位置
+        if position < 1 or position > len(sequence):
+            raise ValueError(f"Position {position} is out of sequence bounds (1-{len(sequence)})")
+        if sequence[position - 1] != wt_aa:
+            raise ValueError(f"Sequence at position {position} is '{sequence[position - 1]}', expected wildtype '{wt_aa}'")
+        
         # 创建mask序列
         mask_sequence = list(sequence)
         mask_sequence[position - 1] = self.alphabet.get_tok(self.alphabet.mask_idx)
@@ -108,26 +163,29 @@ class ESMScorer:
         logits = self.get_logits(mask_sequence)
         target_logits = logits[position - 1, :]
         
-        # 转换为概率
-        probs = torch.softmax(torch.tensor(target_logits), dim=0).numpy()
+        # 转换为概率 (使用PyTorch避免numpy<->torch拷贝)
+        probs_tensor = torch.softmax(torch.tensor(target_logits).to(self.device), dim=0)
         
-        # 计算敏感度
-        wt_idx = AA_TO_INDEX[wt_aa]
-        wt_prob = probs[wt_idx]
+        # 计算敏感度，只针对标准氨基酸
+        wt_idx = self.alphabet.tok_to_idx[wt_aa]
+        wt_prob = probs_tensor[wt_idx]
         
-        llr_sum = 0.0
-        count = 0
-        
-        for aa, idx in AA_TO_INDEX.items():
+        # 矢量化计算所有标准氨基酸的LLR
+        llr_values = []
+        for aa in STANDARD_AMINO_ACIDS:
             if aa != wt_aa:
-                aa_prob = probs[idx]
-                llr_sum += np.log(aa_prob + 1e-10) - np.log(wt_prob + 1e-10)
-                count += 1
+                aa_idx = self.alphabet.tok_to_idx[aa]
+                aa_prob = probs_tensor[aa_idx]
+                llr_values.append(torch.log(aa_prob + 1e-10) - torch.log(wt_prob + 1e-10))
         
-        sensitivity = llr_sum / count
+        if llr_values:
+            sensitivity = torch.mean(torch.stack(llr_values)).cpu().item()
+        else:
+            sensitivity = 0.0
         
         return sensitivity
     
+    @torch.no_grad()
     def score_mutations(self, sequence, mutations, calculate_sensitivity=True):
         """批量计算突变的LLR和敏感度
         
@@ -139,44 +197,79 @@ class ESMScorer:
         Returns:
             list of dict: 每个突变的评分结果
         """
+        # 验证所有突变的氨基酸和位置
+        for mutation in mutations:
+            if mutation.wt_aa not in STANDARD_AMINO_ACIDS:
+                raise ValueError(f"Wildtype amino acid '{mutation.wt_aa}' is not a standard amino acid")
+            if mutation.mut_aa not in STANDARD_AMINO_ACIDS:
+                raise ValueError(f"Mutant amino acid '{mutation.mut_aa}' is not a standard amino acid")
+            if mutation.position < 1 or mutation.position > len(sequence):
+                raise ValueError(f"Position {mutation.position} is out of sequence bounds (1-{len(sequence)})")
+            if sequence[mutation.position - 1] != mutation.wt_aa:
+                raise ValueError(f"Mutation {mutation} wildtype mismatch: expected {sequence[mutation.position - 1]}, got {mutation.wt_aa}")
+        
         results = []
         
+        # 对于每个突变位置，批量计算所有需要的突变
+        position_groups = {}
         for mutation in mutations:
-            # 验证突变
-            if mutation.wt_aa != sequence[mutation.position - 1]:
-                raise ValueError(f"Mutation {mutation} wildtype mismatch")
+            if mutation.position not in position_groups:
+                position_groups[mutation.position] = []
+            position_groups[mutation.position].append(mutation)
+        
+        for position, group_mutations in position_groups.items():
+            # 创建mask序列
+            mask_sequence = list(sequence)
+            mask_sequence[position - 1] = self.alphabet.get_tok(self.alphabet.mask_idx)
+            mask_sequence = "".join(mask_sequence)
             
-            # 计算LLR
-            llr = self.calculate_llr(
-                sequence=sequence,
-                position=mutation.position,
-                wt_aa=mutation.wt_aa,
-                mut_aa=mutation.mut_aa
-            )
+            # 获取logits
+            logits = self.get_logits(mask_sequence)
+            target_logits = logits[position - 1, :]
             
-            # 计算敏感度
+            # 转换为概率 (直接在设备上使用PyTorch，避免numpy<->torch拷贝)
+            probs_tensor = torch.softmax(torch.tensor(target_logits).to(self.device), dim=0)
+            
+            # 计算该位置所有突变的LLR
+            wt_aa = group_mutations[0].wt_aa  # 同一位置的野生型氨基酸相同
+            wt_idx = self.alphabet.tok_to_idx[wt_aa]
+            wt_prob = probs_tensor[wt_idx]
+            
+            # 计算敏感度（如果需要）
             sensitivity = None
             if calculate_sensitivity:
-                sensitivity = self.calculate_sensitivity(
-                    sequence=sequence,
-                    position=mutation.position,
-                    wt_aa=mutation.wt_aa,
-                    full_length=False
-                )
+                # 矢量化计算所有标准氨基酸的LLR
+                llr_values = []
+                for aa in STANDARD_AMINO_ACIDS:
+                    if aa != wt_aa:
+                        aa_idx = self.alphabet.tok_to_idx[aa]
+                        aa_prob = probs_tensor[aa_idx]
+                        llr_values.append(torch.log(aa_prob + 1e-10) - torch.log(wt_prob + 1e-10))
+                
+                if llr_values:
+                    sensitivity = torch.mean(torch.stack(llr_values)).cpu().item()
             
-            results.append({
-                "mutation": str(mutation),
-                "position": mutation.position,
-                "wt_aa": mutation.wt_aa,
-                "mut_aa": mutation.mut_aa,
-                "llr": llr,
-                "sensitivity": sensitivity
-            })
+            # 为该位置的每个突变计算LLR
+            for mutation in group_mutations:
+                mut_idx = self.alphabet.tok_to_idx[mutation.mut_aa]
+                mut_prob = probs_tensor[mut_idx]
+                llr = (torch.log(mut_prob + 1e-10) - torch.log(wt_prob + 1e-10)).cpu().item()
+                
+                results.append({
+                    "mutation": str(mutation),
+                    "position": mutation.position,
+                    "wt_aa": mutation.wt_aa,
+                    "mut_aa": mutation.mut_aa,
+                    "llr": llr,
+                    "sensitivity": sensitivity
+                })
         
         return results
 
-# 创建全局ESM评分器实例
-esm_scorer = ESMScorer()
+@st.cache_resource
+def get_esm_scorer(model_name="esm2_t6_8M_UR50D", device=None):
+    """获取ESM评分器实例（支持复用，使用Streamlit缓存）"""
+    return ESMScorer(model_name=model_name, device=device)
 
 @disk_cache(duration=timedelta(days=7))
 def score_mutations(sequence, mutations, calculate_sensitivity=True):
@@ -190,4 +283,5 @@ def score_mutations(sequence, mutations, calculate_sensitivity=True):
     Returns:
         list of dict: 每个突变的评分结果
     """
-    return esm_scorer.score_mutations(sequence, mutations, calculate_sensitivity)
+    scorer = get_esm_scorer()
+    return scorer.score_mutations(sequence, mutations, calculate_sensitivity)
