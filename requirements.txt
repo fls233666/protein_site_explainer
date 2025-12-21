@@ -1,0 +1,12 @@
+streamlit
+pytest
+requests
+pandas
+numpy
+plotly
+py3Dmol
+biopython
+scikit-learn
+torch
+esm
+joblib
