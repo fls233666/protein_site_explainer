@@ -66,7 +66,7 @@ if st.button("Explain Mutations"):
             # 显示结果表格
             st.subheader("Mutation Analysis Results")
             results_df = result["results_df"]
-            st.dataframe(results_df, use_container_width=True)
+            st.dataframe(results_df, width='stretch')
             
             # 下载CSV功能
             csv = results_df.to_csv(index=False)
@@ -89,13 +89,13 @@ if st.button("Explain Mutations"):
                 
                 # 绘制序列特征图
                 fig = visualizer.plot_sequence_profile(results_df, plddt_profile)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 # 绘制pLDDT热图（如果有数据）
                 if plddt_profile is not None:
                     plddt_fig = visualizer.plot_plddt_heatmap(plddt_profile)
-                    st.plotly_chart(plddt_fig, use_container_width=True)
+                    st.plotly_chart(plddt_fig, width='stretch')
                 else:
                     st.info("AlphaFold pLDDT data not available for this protein")
             
