@@ -145,14 +145,6 @@ pytest tests/test_full_flow.py -v
 3. **缓存机制**：结果会自动缓存，提高重复查询的速度
 4. **数据验证**：请确保输入的 UniProt ID 和突变格式正确
 
-## 许可证
-
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
 ## 联系方式
 
 如有问题或建议，请通过以下方式联系：
