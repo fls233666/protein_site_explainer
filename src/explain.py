@@ -10,12 +10,13 @@ class Explainer:
     """蛋白质位点解释器"""
     
     @disk_cache(duration=timedelta(days=7))
-    def explain(self, uniprot_id, mutation_list_str):
+    def explain(self, uniprot_id, mutation_list_str, calculate_sensitivity=True):
         """解释蛋白质突变
         
         Args:
             uniprot_id: UniProt ID字符串
             mutation_list_str: 突变列表字符串，如 "A123T, K456M"
+            calculate_sensitivity: 是否计算位点敏感度
             
         Returns:
             dict: 包含所有解释结果的数据结构
@@ -31,7 +32,7 @@ class Explainer:
         validate_mutations(mutations, sequence)
         
         # 4. 计算ESM评分
-        esm_results = score_mutations(sequence, mutations)
+        esm_results = score_mutations(sequence, mutations, calculate_sensitivity)
         
         # 5. 获取AlphaFold数据（可能返回None）
         alphafold_data = get_alphafold_data(uniprot_id)
@@ -130,17 +131,18 @@ class Explainer:
 # 创建全局解释器实例
 explainer = Explainer()
 
-def explain_mutations(uniprot_id, mutation_list_str):
+def explain_mutations(uniprot_id, mutation_list_str, calculate_sensitivity=True):
     """解释突变的便捷函数
     
     Args:
         uniprot_id: UniProt ID字符串
         mutation_list_str: 突变列表字符串
+        calculate_sensitivity: 是否计算位点敏感度
         
     Returns:
         dict: 解释结果
     """
-    return explainer.explain(uniprot_id, mutation_list_str)
+    return explainer.explain(uniprot_id, mutation_list_str, calculate_sensitivity)
 
 def generate_csv(result, output_file):
     """生成CSV文件的便捷函数

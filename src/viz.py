@@ -27,11 +27,12 @@ class Visualizer:
         fig.add_trace(go.Scatter(
             x=results_df["Position"],
             y=results_df["ESM_LLR"],
-            mode="markers+text",
+            mode="markers",
             name="ESM LLR",
             marker=dict(size=10, color="blue"),
             text=results_df["Mutation"],
-            textposition="top center"
+            textposition="top center",
+            hovertemplate="Mutation: %{text}<br>Position: %{x}<br>ESM LLR: %{y:.2f}<extra></extra>"
         ))
         
         # 2. 绘制位点敏感度
@@ -40,7 +41,9 @@ class Visualizer:
             y=results_df["Site_Sensitivity"],
             mode="markers",
             name="Site Sensitivity",
-            marker=dict(size=10, color="green", symbol="triangle-up")
+            marker=dict(size=10, color="green", symbol="triangle-up"),
+            text=results_df["Mutation"],
+            hovertemplate="Mutation: %{text}<br>Position: %{x}<br>Site Sensitivity: %{y:.2f}<extra></extra>"
         ))
         
         # 3. 绘制pLDDT曲线
@@ -56,7 +59,6 @@ class Visualizer:
         
         # 布局设置
         fig.update_layout(
-            title="Protein Sequence Features",
             xaxis=dict(
                 title="Amino Acid Position",
                 range=x_range,
@@ -81,7 +83,8 @@ class Visualizer:
                 x=1
             ),
             hovermode="x unified",
-            height=600
+            height=600,
+            margin=dict(t=50)
         )
         
         return fig
@@ -176,10 +179,10 @@ class Visualizer:
         ))
         
         fig.update_layout(
-            title="AlphaFold pLDDT Score Distribution",
             xaxis_title="Amino Acid Position",
             yaxis_title="Feature",
-            height=200
+            height=200,
+            margin=dict(t=30)
         )
         
         return fig

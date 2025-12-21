@@ -32,8 +32,8 @@ def test_full_explain_flow(monkeypatch):
     def mock_get_alphafold_data(uniprot_id):
         return mock_alphafold_data
     
-    def mock_score_mutations(sequence, mutations):
-        return mock_esm_results
+    def mock_score_mutations(sequence, mutations, calculate_sensitivity=True):
+            return mock_esm_results
     
     # 使用monkeypatch
     monkeypatch.setattr("src.explain.get_uniprot_entry", mock_get_uniprot_entry)
@@ -96,8 +96,8 @@ def test_multiple_mutations(monkeypatch):
     def mock_get_alphafold_data(uniprot_id):
         return mock_alphafold_data
     
-    def mock_score_mutations(sequence, mutations):
-        return mock_esm_results
+    def mock_score_mutations(sequence, mutations, calculate_sensitivity=True):
+            return mock_esm_results
     
     # 使用monkeypatch
     monkeypatch.setattr("src.explain.get_uniprot_entry", mock_get_uniprot_entry)
