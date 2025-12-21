@@ -51,6 +51,8 @@ pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
+**注意**：在 Windows 系统上，推荐使用 `python -m streamlit` 格式而不是直接使用 `streamlit` 命令，因为后者可能会因为 PATH 环境变量配置问题导致 "streamlit: command not found" 错误。
+
 应用将在浏览器中打开，默认地址为 `http://localhost:8501`。
 
 ## 使用示例
