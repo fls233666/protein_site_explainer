@@ -36,15 +36,23 @@ def get_alphafold_data(uniprot_id):
         uniprot_id: UniProt ID字符串
         
     Returns:
-        AlphaFoldData 对象
+        AlphaFoldData 对象，如果AlphaFold数据不存在则返回None
     
     Raises:
-        requests.exceptions.HTTPError: 如果下载失败
+        requests.exceptions.HTTPError: 如果下载失败（除了404错误）
     """
     # 下载PDB文件
     pdb_gz_url = ALPHAFOLD_URL.format(uniprot_id)
     response = requests.get(pdb_gz_url)
-    response.raise_for_status()
+    
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        # 如果是404错误，返回None
+        if response.status_code == 404:
+            return None
+        # 其他HTTP错误仍然抛出异常
+        raise e
     
     # 解压缩PDB内容
     pdb_content = gzip.decompress(response.content).decode('utf-8')

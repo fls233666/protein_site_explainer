@@ -47,7 +47,7 @@ class ESMScorer:
         
         # 前向传播
         results = self.model(batch_tokens, repr_layers=[])
-        logits = results.logits.cpu().numpy()
+        logits = results["logits"].cpu().numpy()
         
         # 移除起始和结束标记
         return logits[0, 1:-1, :]  # (seq_len, 21)
@@ -101,7 +101,7 @@ class ESMScorer:
         
         # 创建mask序列
         mask_sequence = list(sequence)
-        mask_sequence[position - 1] = self.alphabet.mask_idx
+        mask_sequence[position - 1] = self.alphabet.get_tok(self.alphabet.mask_idx)
         mask_sequence = "".join(mask_sequence)
         
         # 获取logits

@@ -33,7 +33,7 @@ class Explainer:
         # 4. 计算ESM评分
         esm_results = score_mutations(sequence, mutations)
         
-        # 5. 获取AlphaFold数据
+        # 5. 获取AlphaFold数据（可能返回None）
         alphafold_data = get_alphafold_data(uniprot_id)
         
         # 6. 映射UniProt特征到突变位置
@@ -45,8 +45,10 @@ class Explainer:
         for mutation, esm_result in zip(mutations, esm_results):
             position = mutation.position
             
-            # 获取pLDDT分数
-            plddt = alphafold_data.get_plddt_at_position(position)
+            # 获取pLDDT分数（处理AlphaFold数据不存在的情况）
+            plddt = None
+            if alphafold_data is not None:
+                plddt = alphafold_data.get_plddt_at_position(position)
             
             # 获取特征
             features = feature_map.get(position, [])
@@ -114,11 +116,14 @@ class Explainer:
         """获取pLDDT分布曲线数据
         
         Args:
-            alphafold_data: AlphaFoldData 对象
+            alphafold_data: AlphaFoldData 对象，可能为None
             
         Returns:
-            pandas.DataFrame: 包含位置和pLDDT分数的数据框
+            pandas.DataFrame: 包含位置和pLDDT分数的数据框，如果没有AlphaFold数据则返回None
         """
+        if alphafold_data is None or not alphafold_data.plddt_scores:
+            return None
+        
         positions, scores = zip(*alphafold_data.plddt_scores)
         return pd.DataFrame({"Position": positions, "pLDDT": scores})
 

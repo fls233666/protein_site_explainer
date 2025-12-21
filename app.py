@@ -92,18 +92,24 @@ if st.button("Explain Mutations"):
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                # 绘制pLDDT热图
-                plddt_fig = visualizer.plot_plddt_heatmap(plddt_profile)
-                st.plotly_chart(plddt_fig, use_container_width=True)
+                # 绘制pLDDT热图（如果有数据）
+                if plddt_profile is not None:
+                    plddt_fig = visualizer.plot_plddt_heatmap(plddt_profile)
+                    st.plotly_chart(plddt_fig, use_container_width=True)
+                else:
+                    st.info("AlphaFold pLDDT data not available for this protein")
             
             # 2. 3D结构视图
             st.subheader("3D Structure View")
             
-            # 创建3D视图
-            view = visualizer.create_3d_structure(uniprot_id, result["mutations"])
-            
-            # 在Streamlit中显示3D视图
-            st.py3Dmol(view)
+            try:
+                # 创建3D视图
+                view = visualizer.create_3d_structure(uniprot_id, result["mutations"])
+                
+                # 在Streamlit中显示3D视图
+                st.py3Dmol(view)
+            except Exception as e:
+                st.info("3D structure visualization not available for this protein")
             
             # 3. 序列信息
             st.subheader("Sequence Information")
@@ -126,13 +132,22 @@ if st.button("Explain Mutations"):
             
             st.text(sequence_display)
             
-        except ValueError as e:
-            st.error(f"Input error: {e}")
+            # 检查是否有AlphaFold数据
+            if result["alphafold_data"] is None:
+                st.warning(f"AlphaFold structure data not available for UniProt ID {uniprot_id}")
+                st.info("Results without AlphaFold data still include ESM scores and UniProt features")
+            
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
-                st.error(f"UniProt ID not found: {uniprot_id}")
+                # 检查错误是否来自UniProt API
+                if "uniprot" in str(e).lower():
+                    st.error(f"UniProt ID not found: {uniprot_id}")
+                else:
+                    st.error(f"AlphaFold structure not found for UniProt ID: {uniprot_id}")
             else:
                 st.error(f"API error: {e}")
+        except ValueError as e:
+            st.error(f"Input error: {e}")
         except Exception as e:
             st.error(f"Unexpected error: {e}")
             st.exception(e)
