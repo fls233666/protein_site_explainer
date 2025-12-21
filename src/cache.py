@@ -44,6 +44,8 @@ def disk_cache(duration=timedelta(days=7), ignore_args=None):
                 "timestamp": time.time(),
                 "result": result
             }
+            # 再次确保目录存在，增加健壮性
+            os.makedirs(func_cache_dir, exist_ok=True)
             joblib.dump(cache_info, cache_file)
             
             return result
