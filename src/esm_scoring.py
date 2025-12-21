@@ -46,8 +46,8 @@ class ESMScorer:
             batch_tokens = batch_tokens.cuda()
         
         # 前向传播
-        results = self.model(batch_tokens, repr_layers=[], return_logits=True)
-        logits = results["logits"].cpu().numpy()
+        results = self.model(batch_tokens, repr_layers=[])
+        logits = results.logits.cpu().numpy()
         
         # 移除起始和结束标记
         return logits[0, 1:-1, :]  # (seq_len, 21)
