@@ -48,7 +48,7 @@ pip install -r requirements.txt
 使用以下命令启动 Streamlit 应用：
 
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 应用将在浏览器中打开，默认地址为 `http://localhost:8501`。
