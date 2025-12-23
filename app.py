@@ -147,7 +147,7 @@ st.header(translations["main"]["results"])
 # 提交按钮（居中显示）
 _, submit_col, _ = st.columns([1, 2, 1])
 with submit_col:
-    clicked = st.button(translations["main"]["explain_mutations"], type="primary", use_container_width=True)
+    clicked = st.button(translations["main"]["explain_mutations"], type="primary", width='stretch')
 
 # 结果渲染（在列作用域外）
 if clicked or "last_result" in st.session_state:
@@ -207,7 +207,7 @@ if clicked or "last_result" in st.session_state:
             
             # 使用卡片布局显示表格
             with st.container():
-                st.dataframe(results_df, use_container_width=True, height=300)
+                st.dataframe(results_df, width='stretch', height=300)
                 
                 # 下载CSV按钮居中显示
                 _, download_col, _ = st.columns([1, 2, 1])
@@ -218,7 +218,7 @@ if clicked or "last_result" in st.session_state:
                         data=csv,
                         file_name=f"{uniprot_id}_mutations.csv",
                         mime="text/csv",
-                        use_container_width=True
+                        width='stretch'
                     )
         
         # 2. 序列可视化标签页
@@ -234,7 +234,34 @@ if clicked or "last_result" in st.session_state:
                 with st.container(border=True):
                     st.write(translations["main"]["sequence_profile_with_mutations"])
                     fig = visualizer.plot_sequence_profile(results_df, plddt_profile)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
+                    
+                    # 导出区域
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        # HTML下载按钮
+                        html_str = fig.to_html(full_html=True, include_plotlyjs=True)
+                        st.download_button(
+                            label=translations["main"]["download_sequence_profile_html"],
+                            data=html_str,
+                            file_name=f"{uniprot_id}_sequence_profile_with_mutations.html",
+                            mime="text/html",
+                            width='stretch'
+                        )
+                    with col2:
+                        # PNG下载按钮（尝试实现）
+                        try:
+                            png_bytes = fig.to_image(format="png", scale=2)
+                            st.download_button(
+                                label=translations["main"]["download_sequence_profile_png"],
+                                data=png_bytes,
+                                file_name=f"{uniprot_id}_sequence_profile_with_mutations.png",
+                                mime="image/png",
+                                width='stretch'
+                            )
+                        except Exception as e:
+                            st.warning(translations["main"]["kaleido_missing_hint"])
+                            st.info(f"PNG export failed: {str(e)}")
             
             with col2:
                 # 绘制pLDDT热图（如果有数据）
@@ -242,7 +269,7 @@ if clicked or "last_result" in st.session_state:
                     st.write(translations["main"]["alphafold_plddt"])
                     if plddt_profile is not None:
                         plddt_fig = visualizer.plot_plddt_heatmap(plddt_profile)
-                        st.plotly_chart(plddt_fig, use_container_width=True)
+                        st.plotly_chart(plddt_fig, width='stretch')
                     else:
                         st.info(translations["main"]["plddt_not_available"])
         

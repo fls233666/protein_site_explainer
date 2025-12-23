@@ -21,6 +21,7 @@ setup(
         "torch>=2.0.0",
         "esm>=2.0.0",
         "joblib>=1.3.0",
+        "kaleido>=0.2.0",
     ],
     extras_require={
         "cpu": [
