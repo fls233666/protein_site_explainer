@@ -260,6 +260,7 @@ protein_site_explainer/
 - **alphafold.py**: 从 AlphaFold 数据库获取 pLDDT 数据和结构文件：
   - 与 `uniprot.py` 共享请求会话配置
   - 详细的错误处理和状态报告
+  - 通过 AlphaFold DB API 获取最新 PDB 文件 URL，避免版本硬编码
 
 - **esm_scoring.py**: 使用 ESM-2 模型计算 LLR 和位点敏感度：
   - 批处理：按位置分组突变，减少计算时间

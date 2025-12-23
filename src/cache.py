@@ -15,7 +15,7 @@ DEFAULT_CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".c
 os.makedirs(DEFAULT_CACHE_DIR, exist_ok=True)
 
 # 缓存版本号 - 当代码或模型版本变化时，更新此版本号
-CACHE_VERSION = "v1.0"
+CACHE_VERSION = "v1.1"
 
 # 缓存文件锁
 _cache_locks = {}
@@ -28,7 +28,7 @@ def _get_lock(cache_file):
             _cache_locks[cache_file] = threading.Lock()
         return _cache_locks[cache_file]
 
-def disk_cache(duration=timedelta(days=7), ignore_args=None, cache_dir=None, max_size=None, ttl=None):
+def disk_cache(duration=timedelta(days=7), ignore_args=None, cache_dir=None, max_size=None, ttl=None, cache_none=False):
     """磁盘缓存装饰器
     
     Args:
@@ -37,6 +37,7 @@ def disk_cache(duration=timedelta(days=7), ignore_args=None, cache_dir=None, max
         cache_dir: 自定义缓存目录，默认为项目根目录下的.cache
         max_size: 最大缓存大小（字节），超过则清理旧缓存
         ttl: 可选的TTL（生存时间），优先级高于duration
+        cache_none: 是否缓存None值，默认为False
     """
     # 使用自定义缓存目录或默认目录
     base_cache_dir = cache_dir or DEFAULT_CACHE_DIR
@@ -67,30 +68,33 @@ def disk_cache(duration=timedelta(days=7), ignore_args=None, cache_dir=None, max
                     if expire_time > time.time():
                         return cache_info["result"]
             
-            # 执行函数并缓存结果
+            # 执行函数
             result = func(*args, **kwargs)
-            cache_info = {
-                "timestamp": time.time(),
-                "result": result,
-                "version": CACHE_VERSION
-            }
             
-            # 并发安全的缓存写入（使用临时文件 + 原子重命名）
-            with _get_lock(cache_file):
-                # 再次确保目录存在，增加健壮性
-                os.makedirs(func_cache_dir, exist_ok=True)
+            # 只有当结果不为None或允许缓存None值时才进行缓存
+            if result is not None or cache_none:
+                cache_info = {
+                    "timestamp": time.time(),
+                    "result": result,
+                    "version": CACHE_VERSION
+                }
                 
-                # 使用临时文件写入
-                with tempfile.NamedTemporaryFile(dir=func_cache_dir, suffix=".joblib", delete=False) as tmp_file:
-                    tmp_file_path = tmp_file.name
-                    joblib.dump(cache_info, tmp_file_path)
+                # 并发安全的缓存写入（使用临时文件 + 原子重命名）
+                with _get_lock(cache_file):
+                    # 再次确保目录存在，增加健壮性
+                    os.makedirs(func_cache_dir, exist_ok=True)
+                    
+                    # 使用临时文件写入
+                    with tempfile.NamedTemporaryFile(dir=func_cache_dir, suffix=".joblib", delete=False) as tmp_file:
+                        tmp_file_path = tmp_file.name
+                        joblib.dump(cache_info, tmp_file_path)
+                    
+                    # 原子重命名替换旧文件
+                    os.replace(tmp_file_path, cache_file)
                 
-                # 原子重命名替换旧文件
-                os.replace(tmp_file_path, cache_file)
-            
-            # 如果设置了最大大小，检查并清理缓存
-            if max_size:
-                _cleanup_cache(func_cache_dir, max_size)
+                # 如果设置了最大大小，检查并清理缓存
+                if max_size:
+                    _cleanup_cache(func_cache_dir, max_size)
             
             return result
         
