@@ -26,6 +26,11 @@ if "result" not in st.session_state:
 if "input_params" not in st.session_state:
     st.session_state["input_params"] = {}  # 存储输入参数
 
+# 初始化输入控件的默认值
+st.session_state.setdefault("uniprot_id", "P0DTC2")  # SARS-CoV-2 Spike protein example
+st.session_state.setdefault("mutation_list_str", "D614G, A222V, T478K")  # Spike protein examples
+st.session_state.setdefault("calculate_sensitivity", True)
+
 # 加载当前语言的翻译
 translations = load_translations(st.session_state["language"])
 
@@ -94,46 +99,44 @@ st.title(translations["page_title_display"])
 with st.sidebar:
     # 语言选择器
     st.markdown("### Language / 语言")
-    language_options = {"English": "en", "简体中文": "zh"}
-    selected_language_display = [key for key, value in language_options.items() if value == st.session_state["language"]][0]
-    selected_language_display = st.selectbox(
+    
+    # 使用稳定key的selectbox，选项为["en","zh"]，用format_func显示为"English/简体中文"
+    # 直接使用key="language"，让Streamlit自动处理状态管理
+    st.selectbox(
         "Select language",
-        options=list(language_options.keys()),
-        index=list(language_options.values()).index(st.session_state["language"]),
+        options=["en", "zh"],
+        index=0 if st.session_state["language"] == "en" else 1,
+        format_func=lambda x: "English" if x == "en" else "简体中文",
+        key="language",
         label_visibility="collapsed"
     )
-    
-    # 如果语言变化，更新session_state
-    if selected_language_display != [key for key, value in language_options.items() if value == st.session_state["language"]][0]:
-        st.session_state["language"] = language_options[selected_language_display]
-        st.rerun()
     
     # 输入参数部分
     st.markdown("---")
     st.header(translations["sidebar"]["input_parameters"])
     
     # UniProt ID输入
-    uniprot_id = st.text_input(
+    st.text_input(
         translations["sidebar"]["uniprot_id"],
-        value="P0DTC2",  # SARS-CoV-2 Spike protein example
-        help=translations["sidebar"]["uniprot_id_help"])
+        help=translations["sidebar"]["uniprot_id_help"],
+        key="uniprot_id")
     
     # 突变列表输入
-    mutation_list_str = st.text_area(
+    st.text_area(
         translations["sidebar"]["mutation_list"],
-        value="D614G, A222V, T478K",  # Spike protein examples
         help=translations["sidebar"]["mutation_list_help"],
-        height=100)
+        height=100,
+        key="mutation_list_str")
     
     # 高级选项
     st.markdown("---")
     st.subheader(translations["sidebar"]["advanced_options"])
     
     # 计算敏感度的选项
-    calculate_sensitivity = st.checkbox(
+    st.checkbox(
         translations["sidebar"]["calculate_sensitivity"],
-        value=True,
-        help=translations["sidebar"]["calculate_sensitivity_help"])
+        help=translations["sidebar"]["calculate_sensitivity_help"],
+        key="calculate_sensitivity")
     
     # 清除缓存按钮
     st.markdown("---")
@@ -153,23 +156,23 @@ with submit_col:
 if clicked or "last_result" in st.session_state:
     # 检查输入参数
     if clicked:
-        if not uniprot_id.strip():
+        if not st.session_state["uniprot_id"].strip():
             st.error(translations["main"]["enter_uniprot_id"])
-        elif not mutation_list_str.strip():
+        elif not st.session_state["mutation_list_str"].strip():
             st.error(translations["main"]["enter_mutations"])
         else:
             try:
                 # 使用加载状态
                 with st.spinner(translations["main"]["processing_mutations"]):
                     # 调用解释函数
-                    result = explain_mutations(uniprot_id, mutation_list_str, calculate_sensitivity)
+                    result = explain_mutations(st.session_state["uniprot_id"], st.session_state["mutation_list_str"], st.session_state["calculate_sensitivity"])
                 
                 # 保存结果到session_state
                 st.session_state["last_result"] = result
                 st.session_state["input_params"] = {
-                    "uniprot_id": uniprot_id,
-                    "mutation_list_str": mutation_list_str,
-                    "calculate_sensitivity": calculate_sensitivity
+                    "uniprot_id": st.session_state["uniprot_id"],
+                    "mutation_list_str": st.session_state["mutation_list_str"],
+                    "calculate_sensitivity": st.session_state["calculate_sensitivity"]
                 }
             except requests.exceptions.HTTPError as e:
                 # 使用getattr安全地获取status_code，避免e.response为None导致的二次异常
@@ -177,9 +180,9 @@ if clicked or "last_result" in st.session_state:
                 if status_code == 404:
                     # 检查错误是否来自UniProt API
                     if "uniprot" in str(e).lower():
-                        st.error(translations["main"]["uniprot_id_not_found"].format(id=uniprot_id))
+                        st.error(translations["main"]["uniprot_id_not_found"].format(id=st.session_state["uniprot_id"]))
                     else:
-                        st.error(translations["main"]["alphafold_not_found"].format(id=uniprot_id))
+                        st.error(translations["main"]["alphafold_not_found"].format(id=st.session_state["uniprot_id"]))
                 else:
                     st.error(translations["main"]["api_error"].format(error=e))
             except ValueError as e:
