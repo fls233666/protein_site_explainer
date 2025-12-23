@@ -310,7 +310,7 @@ protein_site_explainer/
 pytest
 
 # Windows
-pytest
+python -m pytest
 ```
 
 ### 运行特定测试文件
@@ -319,10 +319,18 @@ pytest
 # Linux/Mac
 pytest tests/test_esm_scoring.py -v
 pytest tests/test_full_flow.py -v
+pytest tests/test_parsing.py -v
+pytest tests/test_uniprot.py -v
+pytest tests/test_alphafold.py -v
+pytest tests/test_viz.py -v
 
 # Windows
-pytest tests/test_esm_scoring.py -v
-pytest tests/test_full_flow.py -v
+python -m pytest tests/test_esm_scoring.py -v
+python -m pytest tests/test_full_flow.py -v
+python -m pytest tests/test_parsing.py -v
+python -m pytest tests/test_uniprot.py -v
+python -m pytest tests/test_alphafold.py -v
+python -m pytest tests/test_viz.py -v
 ```
 
 ### 运行测试并生成覆盖率报告
@@ -332,7 +340,27 @@ pytest tests/test_full_flow.py -v
 pytest --cov=src tests/
 
 # Windows
-pytest --cov=src tests/
+python -m pytest --cov=src tests/
+```
+
+### 运行测试并启用详细输出
+
+```bash
+# Linux/Mac
+pytest -v
+
+# Windows
+python -m pytest -v
+```
+
+### 运行冒烟测试（快速验证核心功能）
+
+```bash
+# Linux/Mac
+pytest -m smoke -v
+
+# Windows
+python -m pytest -m smoke -v
 ```
 
 ### 测试内容

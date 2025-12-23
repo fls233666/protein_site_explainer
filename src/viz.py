@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import py3Dmol
 import pandas as pd
+import os
 from .alphafold import download_pdb
 
 class Visualizer:
@@ -104,15 +105,26 @@ class Visualizer:
         # 下载PDB文件
         pdb_file = download_pdb(uniprot_id)
         
+        # 检查是否成功下载到文件
+        if pdb_file is None:
+            raise Exception(f"No AlphaFold structure available for UniProt ID {uniprot_id}")
+        
+        # 确定文件格式
+        file_extension = os.path.splitext(pdb_file)[1].lower()
+        if file_extension in ['.cif', '.mmcif']:
+            file_format = 'mmcif'
+        else:
+            file_format = 'pdb'
+
         # 创建3D视图
         view = py3Dmol.view(width=width, height=height)
-        view.addModel(open(pdb_file, 'r').read(), 'pdb')
+        view.addModel(open(pdb_file, 'r').read(), file_format)
         
-        # 设置样式
+        # 设置样式 - 使用B-factor作为pLDDT的来源
         view.setStyle({
             "cartoon": {
                 "color": "spectrum",
-                "colorscheme": "pLDDT"
+                "colorscheme": {"prop": "b", "gradient": "redyellowblue", "min": 0, "max": 100}
             }
         })
         

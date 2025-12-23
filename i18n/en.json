@@ -59,6 +59,9 @@
     "alphafold_not_found": "AlphaFold structure not found for UniProt ID: {id}",
     "api_error": "API error: {error}",
     "input_error": "Input error: {error}",
-    "unexpected_error": "Unexpected error: {error}"
+    "unexpected_error": "Unexpected error: {error}",
+    "debug_mode": "Debug Mode",
+    "structure_error_debug": "3D Structure Error (Debug Mode)",
+    "enable_debug_suggestion": "Enable debug mode above for more information about the error"
   }
 }

@@ -3,7 +3,7 @@ import requests
 import gzip
 import tempfile
 from datetime import timedelta
-from Bio.PDB import PDBParser
+from Bio.PDB import PDBParser, MMCIFParser
 from .cache import disk_cache
 from .uniprot import create_session
 
@@ -51,15 +51,19 @@ def fetch_afdb_predictions(uniprot_id):
     try:
         response = _session.get(url, timeout=(5, 60))
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        # 如果返回空对象或空列表，返回None而不是空列表，避免被缓存
+        if not data:
+            return None
+        return data
     except requests.exceptions.HTTPError as e:
-        # 如果是404错误，返回空列表
-        if response.status_code == 404:
-            return []
-        # 其他HTTP错误仍然抛出异常
-        raise requests.exceptions.HTTPError(f"Failed to fetch AFDB predictions for ID {uniprot_id}: HTTP {response.status_code} - {response.reason}")
+        # 如果是404错误，返回None而不是空列表
+        if e.response.status_code == 404:
+            return None
+        # 其他HTTP错误直接抛出原始异常
+        raise
     except requests.exceptions.RequestException as e:
-        raise requests.exceptions.RequestException(f"Network error when fetching AFDB predictions for ID {uniprot_id}: {str(e)}")
+        raise
 
 @disk_cache(duration=timedelta(days=30), cache_none=False)
 def get_alphafold_data(uniprot_id):
@@ -108,32 +112,37 @@ def get_alphafold_data(uniprot_id):
         if not pdb_url:
             return None
     
-    # 下载PDB内容
+    # 下载结构内容
     try:
         response = _session.get(pdb_url, timeout=(5, 60))
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
         # 如果是404错误，返回None
-        if response.status_code == 404:
+        if e.response.status_code == 404:
             return None
-        # 其他HTTP错误仍然抛出异常
-        raise requests.exceptions.HTTPError(f"Failed to fetch AlphaFold data for ID {uniprot_id}: HTTP {response.status_code} - {response.reason}")
+        # 其他HTTP错误直接抛出原始异常
+        raise
     except requests.exceptions.RequestException as e:
-        raise requests.exceptions.RequestException(f"Network error when fetching AlphaFold data for ID {uniprot_id}: {str(e)}")
+        raise
     
     # 检查文件是否为gzip格式并解压缩
     if pdb_url.endswith(".gz"):
-        pdb_content = gzip.decompress(response.content).decode('utf-8')
+        structure_content = gzip.decompress(response.content).decode('utf-8')
     else:
-        pdb_content = response.content.decode('utf-8')
+        structure_content = response.content.decode('utf-8')
     
-    # 解析PDB文件
+    # 解析结构文件
     plddt_scores = []
     
-    # 使用Bio.PDB解析
     from io import StringIO
-    parser = PDBParser(QUIET=True)
-    structure = parser.get_structure(uniprot_id, StringIO(pdb_content))
+    
+    # 根据文件格式选择解析器
+    if pdb_url.lower().endswith('.cif') or pdb_url.lower().endswith('.mmcif') or pdb_url.lower().endswith('.cif.gz') or pdb_url.lower().endswith('.mmcif.gz'):
+        parser = MMCIFParser(QUIET=True)
+    else:
+        parser = PDBParser(QUIET=True)
+    
+    structure = parser.get_structure(uniprot_id, StringIO(structure_content))
     
     # 遍历所有原子，提取B-factor作为pLDDT分数
     seen_positions = set()
@@ -165,25 +174,57 @@ def download_pdb(uniprot_id, save_dir=None):
     
     Args:
         uniprot_id: UniProt ID字符串
-        save_dir: 保存目录，默认使用当前目录
+        save_dir: 保存目录，默认使用系统临时目录
         
     Returns:
         str: PDB文件路径
     """
     if save_dir is None:
-        save_dir = os.getcwd()
+        save_dir = tempfile.gettempdir()
     
     # 确保保存目录存在
     os.makedirs(save_dir, exist_ok=True)
     
+    # 检查本地文件是否存在（首先尝试本地fallback）
+    # 1. 检查环境变量ALPHAFOLD_LOCAL_DIR
+    local_dir = os.environ.get("ALPHAFOLD_LOCAL_DIR")
+    if local_dir is None:
+        # 2. 检查当前目录下的models子目录
+        local_dir = os.path.join(os.getcwd(), "models")
+    
+    # 尝试找到本地结构文件
+    target_entry_id = f"AF-{uniprot_id}-F1"
+    local_filenames = [
+        f"{target_entry_id}-model_v6.pdb",
+        f"{target_entry_id}-model_v6.cif",
+        f"{target_entry_id}-model_v6.pdb.gz",
+        f"{target_entry_id}-model_v6.cif.gz"
+    ]
+    
+    # 检查本地文件
+    for filename in local_filenames:
+        local_file_path = os.path.join(local_dir, filename)
+        if os.path.exists(local_file_path):
+            # 如果是压缩文件，解压到临时目录
+            if filename.endswith(".gz"):
+                import gzip
+                output_filename = filename[:-3]
+                output_path = os.path.join(save_dir, output_filename)
+                
+                with gzip.open(local_file_path, 'rb') as f_in:
+                    with open(output_path, 'wb') as f_out:
+                        f_out.write(f_in.read())
+                return output_path
+            return local_file_path
+    
+    # 如果没有本地文件，继续从API获取
     # 从AFDB API获取预测数据
     predictions = fetch_afdb_predictions(uniprot_id)
     
     if not predictions:
-        raise Exception(f"No AlphaFold predictions found for UniProt ID {uniprot_id}")
+        return None
     
     # 找到最匹配的预测条目
-    target_entry_id = f"AF-{uniprot_id}-F1"
     selected_prediction = None
     
     # 优先选择entryId匹配的条目

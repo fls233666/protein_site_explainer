@@ -7,6 +7,7 @@ import os
 from src.explain import explain_mutations, explainer
 from src.viz import visualizer
 from src.cache import clear_cache
+from stmol import showmol
 
 # 加载语言文件
 def load_translations(language):
@@ -145,7 +146,9 @@ if clicked or "last_result" in st.session_state:
                     "calculate_sensitivity": calculate_sensitivity
                 }
             except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 404:
+                # 使用getattr安全地获取status_code，避免e.response为None导致的二次异常
+                status_code = getattr(e.response, "status_code", None)
+                if status_code == 404:
                     # 检查错误是否来自UniProt API
                     if "uniprot" in str(e).lower():
                         st.error(translations["main"]["uniprot_id_not_found"].format(id=uniprot_id))
@@ -219,14 +222,29 @@ if clicked or "last_result" in st.session_state:
         
         # 3. 3D结构视图标签页
         with tabs[2]:
+            # 添加debug开关
+            debug_mode = st.checkbox(translations["main"]["debug_mode"], value=False)
+            
             try:
                 # 创建3D视图
                 with st.container(border=True):
                     view = visualizer.create_3d_structure(uniprot_id, result["mutations"])
                     st.write(translations["main"]["interactive_3d_structure"])
-                    st.py3Dmol(view, use_container_width=True)
+                    showmol(view, height=600, width=800)
+                    
+                    # debug模式下显示额外信息
+                    if debug_mode:
+                        st.markdown(f"**Debug Info:**")
+                        st.markdown(f"- UniProt ID: {uniprot_id}")
+                        st.markdown(f"- Mutation List: {result['mutations']}")
+                        st.markdown(f"- 3D View Object Type: {type(view)}")
             except Exception as e:
-                st.info(translations["main"]["structure_not_available"])
+                if debug_mode:
+                    st.error(translations["main"]["structure_error_debug"])
+                    st.exception(e)
+                else:
+                    st.info(translations["main"]["structure_not_available"])
+                    st.info(translations["main"]["enable_debug_suggestion"])
         
         # 4. 序列信息标签页
         with tabs[3]:

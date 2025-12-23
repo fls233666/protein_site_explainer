@@ -3,7 +3,8 @@ requests
 pandas
 numpy
 plotly
-py3Dmol
+py3Dmol==2.0.0.post2
+stmol
 biopython
 scikit-learn
 torch

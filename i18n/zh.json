@@ -59,6 +59,9 @@
     "alphafold_not_found": "未找到UniProt ID: {id} 的AlphaFold结构",
     "api_error": "API错误: {error}",
     "input_error": "输入错误: {error}",
-    "unexpected_error": "意外错误: {error}"
+    "unexpected_error": "意外错误: {error}",
+    "debug_mode": "调试模式",
+    "structure_error_debug": "3D结构错误（调试模式）",
+    "enable_debug_suggestion": "启用上方的调试模式以获取有关错误的更多信息"
   }
 }
