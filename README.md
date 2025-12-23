@@ -193,17 +193,17 @@ python -m streamlit run app.py
 ### 示例 3：人类血红蛋白β链
 
 - **UniProt ID**: `P68871`
-- **Mutations**: `E6V, D73H`
+- **Mutations**: `P6V, D74H`
 
 ### 示例 4：人类前胰岛素原
 
 - **UniProt ID**: `P01308`
-- **Mutations**: `R34Q, R68C`
+- **Mutations**: `H34Q, L68C`
 
 ### 示例 5：大肠杆菌乳糖阻遏蛋白
 
 - **UniProt ID**: `P03023`
-- **Mutations**: `G46A, S61L`
+- **Mutations**: `N46A, S61L`
 
 ### 示例 6：人类EGFR
 
