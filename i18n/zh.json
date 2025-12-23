@@ -72,6 +72,9 @@
     "unexpected_error": "意外错误: {error}",
     "debug_mode": "调试模式",
     "structure_error_debug": "3D结构错误（调试模式）",
-    "enable_debug_suggestion": "启用上方的调试模式以获取有关错误的更多信息"
+    "enable_debug_suggestion": "启用上方的调试模式以获取有关错误的更多信息",
+    "no_structure_available": "3D结构不可用",
+    "alphaFold_404": "AlphaFold DB 当前没有 {id} 的条目（API 404）。",
+    "local_file_option": "您可以在models目录中提供本地AlphaFold结构文件，或设置ALPHAFOLD_LOCAL_DIR环境变量。支持的文件格式：AF-{uniprot_id}-F1-model_v*.pdb/cif（包括gzip压缩文件）。"
   }
 }

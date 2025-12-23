@@ -41,7 +41,9 @@ def fetch_afdb_predictions(uniprot_id):
         uniprot_id: UniProt ID字符串
         
     Returns:
-        list[dict]: 包含预测信息的字典列表，如果API请求失败则返回空列表
+        tuple: (data, error_reason)，其中：
+            - data: 包含预测信息的字典列表，如果API请求失败则返回None
+            - error_reason: 错误原因字符串，如果成功则返回None
     
     Raises:
         requests.exceptions.HTTPError: 如果API请求失败（除了404错误）
@@ -52,14 +54,14 @@ def fetch_afdb_predictions(uniprot_id):
         response = _session.get(url, timeout=(5, 60))
         response.raise_for_status()
         data = response.json()
-        # 如果返回空对象或空列表，返回None而不是空列表，避免被缓存
+        # 如果返回空对象或空列表，返回None和错误原因
         if not data:
-            return None
-        return data
+            return (None, "AFDB_EMPTY_RESPONSE")
+        return (data, None)
     except requests.exceptions.HTTPError as e:
-        # 如果是404错误，返回None而不是空列表
+        # 如果是404错误，返回None和错误原因
         if e.response.status_code == 404:
-            return None
+            return (None, "AFDB_404")
         # 其他HTTP错误直接抛出原始异常
         raise
     except requests.exceptions.RequestException as e:
@@ -79,9 +81,94 @@ def get_alphafold_data(uniprot_id):
         requests.exceptions.HTTPError: 如果下载失败（除了404错误）
     """
     # 从AFDB API获取预测数据
-    predictions = fetch_afdb_predictions(uniprot_id)
+    predictions, error_reason = fetch_afdb_predictions(uniprot_id)
     
+    # 如果API获取失败，尝试从本地文件加载
     if not predictions:
+        # 检查本地文件是否存在（本地fallback机制）
+        # 1. 检查环境变量ALPHAFOLD_LOCAL_DIR
+        local_dir = os.environ.get("ALPHAFOLD_LOCAL_DIR")
+        if local_dir is None:
+            # 2. 检查当前目录下的models子目录
+            local_dir = os.path.join(os.getcwd(), "models")
+        
+        # 尝试找到本地结构文件
+        target_entry_id = f"AF-{uniprot_id}-F1"
+        local_filenames = []
+        # 支持从model_v6到model_v1的所有版本
+        for version in range(6, 0, -1):
+            local_filenames.extend([
+                f"{target_entry_id}-model_v{version}.pdb",
+                f"{target_entry_id}-model_v{version}.cif",
+                f"{target_entry_id}-model_v{version}.pdb.gz",
+                f"{target_entry_id}-model_v{version}.cif.gz"
+            ])
+        
+        # 查找本地文件
+        local_file_path = None
+        for filename in local_filenames:
+            temp_path = os.path.join(local_dir, filename)
+            if os.path.exists(temp_path):
+                local_file_path = temp_path
+                break
+        
+        if local_file_path:
+            # 检查文件名是否符合AlphaFold结构文件的命名规则
+            filename = os.path.basename(local_file_path)
+            is_alphafold_file = filename.startswith(f"AF-{uniprot_id}-F1-model_v")
+            
+            # 读取本地结构文件
+            import gzip
+            from io import StringIO
+            
+            # 检查文件是否为gzip格式并解压缩
+            if local_file_path.endswith(".gz"):
+                with gzip.open(local_file_path, 'rb') as f:
+                    structure_content = f.read().decode('utf-8')
+            else:
+                with open(local_file_path, 'r') as f:
+                    structure_content = f.read()
+            
+            # 根据文件格式选择解析器
+            if local_file_path.lower().endswith('.cif') or local_file_path.lower().endswith('.mmcif') or local_file_path.lower().endswith('.cif.gz') or local_file_path.lower().endswith('.mmcif.gz'):
+                parser = MMCIFParser(QUIET=True)
+            else:
+                parser = PDBParser(QUIET=True)
+            
+            # 解析结构文件
+            structure = parser.get_structure(uniprot_id, StringIO(structure_content))
+            
+            # 只有AlphaFold文件才提取pLDDT分数（B-factor）
+            if is_alphafold_file:
+                plddt_scores = []
+                seen_positions = set()
+                
+                for model in structure:
+                    for chain in model:
+                        for residue in chain:
+                            if residue.id[0] != ' ':
+                                continue  # 跳过非标准残基
+                            
+                            position = residue.id[1]
+                            if position in seen_positions:
+                                continue
+                            seen_positions.add(position)
+                            
+                            # 获取第一个原子的B-factor（通常所有原子相同）
+                            for atom in residue:
+                                plddt = atom.get_bfactor()
+                                plddt_scores.append((position, plddt))
+                                break
+                
+                # 按位置排序
+                plddt_scores.sort(key=lambda x: x[0])
+                
+                return AlphaFoldData(uniprot_id, plddt_scores)
+            else:
+                # 非AlphaFold文件，不提取pLDDT分数
+                return AlphaFoldData(uniprot_id, [])
+        
+        # 如果没有本地文件，返回None
         return None
     
     # 找到最匹配的预测条目
@@ -194,12 +281,15 @@ def download_pdb(uniprot_id, save_dir=None):
     
     # 尝试找到本地结构文件
     target_entry_id = f"AF-{uniprot_id}-F1"
-    local_filenames = [
-        f"{target_entry_id}-model_v6.pdb",
-        f"{target_entry_id}-model_v6.cif",
-        f"{target_entry_id}-model_v6.pdb.gz",
-        f"{target_entry_id}-model_v6.cif.gz"
-    ]
+    local_filenames = []
+    # 支持从model_v6到model_v1的所有版本
+    for version in range(6, 0, -1):
+        local_filenames.extend([
+            f"{target_entry_id}-model_v{version}.pdb",
+            f"{target_entry_id}-model_v{version}.cif",
+            f"{target_entry_id}-model_v{version}.pdb.gz",
+            f"{target_entry_id}-model_v{version}.cif.gz"
+        ])
     
     # 检查本地文件
     for filename in local_filenames:
@@ -219,7 +309,7 @@ def download_pdb(uniprot_id, save_dir=None):
     
     # 如果没有本地文件，继续从API获取
     # 从AFDB API获取预测数据
-    predictions = fetch_afdb_predictions(uniprot_id)
+    predictions, error_reason = fetch_afdb_predictions(uniprot_id)
     
     if not predictions:
         return None

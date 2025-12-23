@@ -72,6 +72,9 @@
     "unexpected_error": "Unexpected error: {error}",
     "debug_mode": "Debug Mode",
     "structure_error_debug": "3D Structure Error (Debug Mode)",
-    "enable_debug_suggestion": "Enable debug mode above for more information about the error"
+    "enable_debug_suggestion": "Enable debug mode above for more information about the error",
+    "no_structure_available": "3D Structure Not Available",
+    "alphaFold_404": "AlphaFold DB currently has no entry for {id} (API 404).",
+    "local_file_option": "You can provide a local AlphaFold structure file in the models directory or set the ALPHAFOLD_LOCAL_DIR environment variable. Supported file formats: AF-{uniprot_id}-F1-model_v*.pdb/cif (including gzip compressed files)."
   }
 }

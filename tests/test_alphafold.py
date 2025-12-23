@@ -161,13 +161,16 @@ ATOM      2  CA  ALA A   1      10.500  20.500  30.500  1.00  95.00           C
         with mock.patch('src.alphafold.fetch_afdb_predictions') as mock_fetch:
             with mock.patch('src.alphafold._session.get') as mock_get:
                 # 设置fetch_afdb_predictions的返回值
-                mock_fetch.return_value = [
-                    {
-                        "entryId": f"AF-{uniprot_id}-F1",
-                        "modelEntityId": uniprot_id,
-                        "pdbUrl": "https://alphafold.ebi.ac.uk/files/AF-P0DTC2-F1-model_v6.pdb"
-                    }
-                ]
+                mock_fetch.return_value = (
+                    [
+                        {
+                            "entryId": f"AF-{uniprot_id}-F1",
+                            "modelEntityId": uniprot_id,
+                            "pdbUrl": "https://alphafold.ebi.ac.uk/files/AF-P0DTC2-F1-model_v6.pdb"
+                        }
+                    ],
+                    None
+                )
                 # 设置_session.get的返回值
                 mock_get.return_value = mock_pdb_response
                 

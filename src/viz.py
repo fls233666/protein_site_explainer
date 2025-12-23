@@ -107,7 +107,8 @@ class Visualizer:
         
         # 检查是否成功下载到文件
         if pdb_file is None:
-            raise Exception(f"No AlphaFold structure available for UniProt ID {uniprot_id}")
+            # 返回None而不是抛出异常，让UI层处理这种情况
+            return None
         
         # 确定文件格式
         file_extension = os.path.splitext(pdb_file)[1].lower()

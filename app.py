@@ -255,15 +255,30 @@ if clicked or "last_result" in st.session_state:
                 # 创建3D视图
                 with st.container(border=True):
                     view = visualizer.create_3d_structure(uniprot_id, result["mutations"])
-                    st.write(translations["main"]["interactive_3d_structure"])
-                    showmol(view, height=600, width=800)
                     
-                    # debug模式下显示额外信息
-                    if debug_mode:
-                        st.markdown(f"**Debug Info:**")
-                        st.markdown(f"- UniProt ID: {uniprot_id}")
-                        st.markdown(f"- Mutation List: {result['mutations']}")
-                        st.markdown(f"- 3D View Object Type: {type(view)}")
+                    if view is None:
+                        # 如果没有3D结构可用，显示友好提示
+                        st.write(translations["main"]["no_structure_available"])
+                        st.info(translations["main"]["alphaFold_404"].format(id=uniprot_id))
+                        st.info(translations["main"]["local_file_option"])
+                        
+                        # debug模式下显示额外信息
+                        if debug_mode:
+                            st.markdown(f"**Debug Info:**")
+                            st.markdown(f"- UniProt ID: {uniprot_id}")
+                            st.markdown(f"- Mutation List: {result['mutations']}")
+                            st.markdown(f"- 3D View Object: None")
+                    else:
+                        # 如果有3D结构，正常显示
+                        st.write(translations["main"]["interactive_3d_structure"])
+                        showmol(view, height=600, width=800)
+                        
+                        # debug模式下显示额外信息
+                        if debug_mode:
+                            st.markdown(f"**Debug Info:**")
+                            st.markdown(f"- UniProt ID: {uniprot_id}")
+                            st.markdown(f"- Mutation List: {result['mutations']}")
+                            st.markdown(f"- 3D View Object Type: {type(view)}")
             except Exception as e:
                 if debug_mode:
                     st.error(translations["main"]["structure_error_debug"])

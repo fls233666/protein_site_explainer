@@ -182,7 +182,7 @@ python -m streamlit run app.py
 
 ### 示例 1：SARS-CoV-2 Spike 蛋白
 
-- **UniProt ID**: `P0DTC2`
+- **UniProt ID**: `P0DTC2` (注意：该ID在AlphaFold DB可能无法获取，详情请见下方"本地结构文件支持"章节)
 - **Mutations**: `D614G, A222V, T478K`
 
 ### 示例 2：人类 p53 蛋白
@@ -375,6 +375,48 @@ python -m pytest -m smoke -v
   - `test_full_flow.py`: 端到端测试，包括从输入到结果输出
 
 所有测试均在 Windows 和 Linux 系统上验证通过。
+
+## 本地结构文件支持
+
+对于某些 UniProt ID（如 `P0DTC2`），AlphaFold DB 可能无法提供预测的结构文件。在这种情况下，您可以提供本地结构文件，应用将自动使用本地文件进行分析和可视化。
+
+### 本地文件放置位置
+
+应用会按照以下优先级查找本地结构文件：
+
+1. **环境变量指定目录**：如果设置了 `ALPHAFOLD_LOCAL_DIR` 环境变量，应用会首先在此目录中查找文件
+2. **应用运行目录下的 `models` 文件夹**：如果未设置环境变量，应用会在当前运行目录下的 `models` 文件夹中查找文件
+
+### 支持的文件格式和命名规则
+
+应用支持以下格式的本地结构文件：
+
+- **文件格式**：PDB (.pdb)、MMCIF (.cif)、gzip 压缩的 PDB/MMCIF (.pdb.gz, .cif.gz)
+- **命名规则**：`AF-{uniprot_id}-F1-model_v{version}.{format}[.gz]`
+  - 其中 `{uniprot_id}` 是 UniProt ID（如 `P0DTC2`）
+  - `{version}` 是模型版本号（支持 v1-v6）
+  - `{format}` 是文件格式（pdb 或 cif）
+
+例如，对于 P0DTC2，支持以下命名的文件：
+- `AF-P0DTC2-F1-model_v1.pdb`
+- `AF-P0DTC2-F1-model_v6.cif.gz`
+- `AF-P0DTC2-F1-model_v4.pdb.gz`
+
+应用会自动从 v6 到 v1 查找可用的版本，优先使用最新版本。
+
+### 设置本地结构文件的步骤
+
+1. **下载结构文件**：从可信来源（如 UniProt、PDB 或其他结构数据库）下载蛋白质的结构文件
+2. **重命名文件**：按照上述命名规则重命名文件
+3. **放置文件**：将重命名后的文件放入 `ALPHAFOLD_LOCAL_DIR` 目录或 `./models` 目录
+4. **运行应用**：重新运行应用，它将自动使用本地文件
+
+### 对于 P0DTC2 的特别说明
+
+由于 P0DTC2 在 AlphaFold DB 中无法获取，您可以：
+
+1. **提供本地结构文件**：按照上述步骤提供本地结构文件
+2. **使用替代示例**：尝试使用其他示例（如 P04637、P68871 等），这些 ID 在 AlphaFold DB 中都有可用的结构文件
 
 ## 注意事项
 
