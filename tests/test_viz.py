@@ -234,3 +234,84 @@ def test_create_3d_structure_empty_mutations():
         # 清理临时文件
         if os.path.exists(tmp_pdb_path):
             os.unlink(tmp_pdb_path)
+
+
+def test_create_3d_structure_with_structure_file():
+    """测试create_3d_structure函数使用提供的structure_file参数"""
+    # 创建临时PDB文件
+    with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False, mode='w') as tmp_pdb:
+        tmp_pdb.write(sample_pdb_content)
+        tmp_pdb_path = tmp_pdb.name
+    
+    try:
+        # 创建模拟突变列表
+        mutations = [MockMutation(1), MockMutation(2)]
+        
+        # 使用mock来验证download_pdb不会被调用
+        with mock.patch('src.viz.download_pdb') as mock_download_pdb:
+            # 调用create_3d_structure函数，传入structure_file参数
+            view = visualizer.create_3d_structure("P0DTC2", mutations, structure_file=tmp_pdb_path)
+            
+            # 验证download_pdb没有被调用
+            mock_download_pdb.assert_not_called()
+            
+            # 验证返回值类型
+            assert isinstance(view, py3Dmol.view)
+            
+            # 验证HTML生成
+            html = view._make_html()
+            assert html is not None
+            assert isinstance(html, str)
+            assert len(html) > 0
+            
+    finally:
+        # 清理临时文件
+        if os.path.exists(tmp_pdb_path):
+            os.unlink(tmp_pdb_path)
+
+
+def test_build_fullpage_3d_html():
+    """测试build_fullpage_3d_html函数"""
+    # 创建临时PDB文件
+    with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False, mode='w') as tmp_pdb:
+        tmp_pdb.write(sample_pdb_content)
+        tmp_pdb_path = tmp_pdb.name
+    
+    try:
+        # 模拟download_pdb返回临时PDB文件路径
+        with mock.patch('src.viz.download_pdb', return_value=tmp_pdb_path):
+            # 创建模拟突变列表
+            mutations = [MockMutation(1)]
+            
+            # 调用create_3d_structure函数
+            view = visualizer.create_3d_structure("P0DTC2", mutations)
+            
+            # 调用build_fullpage_3d_html函数
+            title = "Test 3D Structure"
+            full_html = visualizer.build_fullpage_3d_html(view, title)
+            
+            # 验证返回值类型
+            assert isinstance(full_html, str)
+            assert len(full_html) > 0
+            
+            # 验证HTML结构完整性
+            assert "<!doctype html>" in full_html
+            assert "<html" in full_html  # 检查HTML标签的开始部分，不关心是否包含属性
+            assert "<head>" in full_html
+            assert "<meta charset='utf-8'>" in full_html
+            assert f"<title>{title}</title>" in full_html
+            assert "<body>" in full_html
+            assert f"<h1 style='text-align: center; margin: 20px 0;'>{title}</h1>" in full_html
+            
+            # 验证3D视图内容包含在HTML中
+            # 不直接比较整个fragment，因为每次调用都会生成随机ID
+            # 而是检查一些关键部分
+            assert "3dmolviewer_" in full_html  # 检查包含3Dmol viewer的div
+            assert "$3Dmol.createViewer" in full_html  # 检查JavaScript创建viewer的代码
+            assert "addModel" in full_html  # 检查添加模型的代码
+            assert "setStyle" in full_html  # 检查设置样式的代码
+            
+    finally:
+        # 清理临时文件
+        if os.path.exists(tmp_pdb_path):
+            os.unlink(tmp_pdb_path)

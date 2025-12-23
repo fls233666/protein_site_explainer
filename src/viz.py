@@ -90,20 +90,21 @@ class Visualizer:
         
         return fig
     
-    def create_3d_structure(self, uniprot_id, mutations, width=800, height=600):
+    def create_3d_structure(self, uniprot_id, mutations, structure_file=None, width=800, height=600):
         """创建3D结构视图
         
         Args:
             uniprot_id: UniProt ID
             mutations: Mutation 对象列表
+            structure_file: 可选，已下载的结构文件路径，避免重复下载
             width: 视图宽度
             height: 视图高度
             
         Returns:
             py3Dmol.view: 3D结构视图
         """
-        # 下载PDB文件
-        pdb_file = download_pdb(uniprot_id)
+        # 下载PDB文件或使用提供的结构文件
+        pdb_file = structure_file or download_pdb(uniprot_id)
         
         # 检查是否成功下载到文件
         if pdb_file is None:
@@ -171,6 +172,32 @@ class Visualizer:
         view.rotate(90, [1, 0, 0])
         
         return view
+    
+    def build_fullpage_3d_html(self, view, title: str) -> str:
+        """构建完整的3D视图HTML页面
+        
+        Args:
+            view: py3Dmol.view对象
+            title: 页面标题
+            
+        Returns:
+            str: 完整的HTML文档
+        """
+        fragment = view._make_html()
+        return f"""<!doctype html>
+<html lang='en'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>{title}</title>
+</head>
+<body>
+    <h1 style='text-align: center; margin: 20px 0;'>{title}</h1>
+    <div style='display: flex; justify-content: center;'>
+        {fragment}
+    </div>
+</body>
+</html>"""
     
     def plot_plddt_heatmap(self, plddt_profile):
         """绘制pLDDT热图

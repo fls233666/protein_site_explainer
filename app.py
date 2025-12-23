@@ -281,7 +281,11 @@ if clicked or "last_result" in st.session_state:
             try:
                 # 创建3D视图
                 with st.container(border=True):
-                    view = visualizer.create_3d_structure(uniprot_id, result["mutations"])
+                    # 先下载结构文件，避免重复下载
+                    from src.alphafold import download_pdb
+                    structure_file = download_pdb(uniprot_id)
+                    
+                    view = visualizer.create_3d_structure(uniprot_id, result["mutations"], structure_file)
                     
                     if view is None:
                         # 如果没有3D结构可用，显示友好提示
@@ -295,10 +299,52 @@ if clicked or "last_result" in st.session_state:
                             st.markdown(f"- UniProt ID: {uniprot_id}")
                             st.markdown(f"- Mutation List: {result['mutations']}")
                             st.markdown(f"- 3D View Object: None")
+                            st.markdown(f"- Structure File: {structure_file}")
                     else:
                         # 如果有3D结构，正常显示
                         st.write(translations["main"]["interactive_3d_structure"])
                         showmol(view, height=600, width=800)
+                        
+                        # 导出区域
+                        st.subheader(translations["main"]["export_3d_section_title"])
+                        export_col1, export_col2 = st.columns(2)
+                        
+                        # HTML导出按钮
+                        with export_col1:
+                            full_html = visualizer.build_fullpage_3d_html(view, title=f"{uniprot_id} 3D Structure View")
+                            st.download_button(
+                                label=translations["main"]["download_3d_view_html"], 
+                                data=full_html, 
+                                file_name=f"{uniprot_id}_3d_structure_view.html", 
+                                mime="text/html",
+                                width='stretch'
+                            )
+                        
+                        # 结构文件导出按钮
+                        with export_col2:
+                            if structure_file and os.path.exists(structure_file):
+                                # 读取结构文件
+                                with open(structure_file, "rb") as f:
+                                    structure_bytes = f.read()
+                                
+                                # 根据扩展名选择文件名和MIME类型
+                                file_extension = os.path.splitext(structure_file)[1].lower()
+                                file_name = f"{uniprot_id}_alphafold_structure{file_extension}"
+                                
+                                if file_extension == ".pdb":
+                                    mime_type = "chemical/x-pdb"
+                                elif file_extension in [".cif", ".mmcif"]:
+                                    mime_type = "chemical/x-mmcif"
+                                else:
+                                    mime_type = "application/octet-stream"
+                                
+                                st.download_button(
+                                    label=translations["main"]["download_structure_file"], 
+                                    data=structure_bytes, 
+                                    file_name=file_name, 
+                                    mime=mime_type,
+                                    width='stretch'
+                                )
                         
                         # debug模式下显示额外信息
                         if debug_mode:
@@ -306,6 +352,7 @@ if clicked or "last_result" in st.session_state:
                             st.markdown(f"- UniProt ID: {uniprot_id}")
                             st.markdown(f"- Mutation List: {result['mutations']}")
                             st.markdown(f"- 3D View Object Type: {type(view)}")
+                            st.markdown(f"- Structure File: {structure_file}")
             except Exception as e:
                 if debug_mode:
                     st.error(translations["main"]["structure_error_debug"])

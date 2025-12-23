@@ -78,6 +78,9 @@
     "local_file_option": "您可以在models目录中提供本地AlphaFold结构文件，或设置ALPHAFOLD_LOCAL_DIR环境变量。支持的文件格式：AF-{uniprot_id}-F1-model_v*.pdb/cif（包括gzip压缩文件）。",
     "download_sequence_profile_html": "📥 下载HTML",
     "download_sequence_profile_png": "📥 下载PNG",
-    "kaleido_missing_hint": "导出PNG需要安装Kaleido。请使用 'pip install kaleido' 安装。"
+    "kaleido_missing_hint": "导出PNG需要安装Kaleido。请使用 'pip install kaleido' 安装。",
+    "download_3d_view_html": "📥 下载3D视图HTML",
+    "download_structure_file": "📥 下载结构文件",
+    "export_3d_section_title": "导出"
   }
 }

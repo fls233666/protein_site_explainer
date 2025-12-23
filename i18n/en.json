@@ -78,6 +78,9 @@
     "local_file_option": "You can provide a local AlphaFold structure file in the models directory or set the ALPHAFOLD_LOCAL_DIR environment variable. Supported file formats: AF-{uniprot_id}-F1-model_v*.pdb/cif (including gzip compressed files).",
     "download_sequence_profile_html": "📥 Download HTML",
     "download_sequence_profile_png": "📥 Download PNG",
-    "kaleido_missing_hint": "Kaleido is required for PNG export. Please install it with 'pip install kaleido'."
+    "kaleido_missing_hint": "Kaleido is required for PNG export. Please install it with 'pip install kaleido'.",
+    "download_3d_view_html": "📥 Download 3D View (HTML)",
+    "download_structure_file": "📥 Download Structure File",
+    "export_3d_section_title": "Export"
   }
 }
