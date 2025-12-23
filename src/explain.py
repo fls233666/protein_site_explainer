@@ -98,7 +98,18 @@ class Explainer:
             
         Returns:
             str: 带有突变标记的序列
+        
+        Warning:
+            此方法已弃用，不再用于UI渲染。请使用src/sequence_view模块中的功能。
         """
+        import warnings
+        warnings.warn(
+            "get_sequence_with_mutations() is deprecated and no longer used for UI rendering. "
+            "Please use functions from src/sequence_view module.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         seq_list = list(sequence)
         mutation_positions = set(mutation.position for mutation in mutations)
         

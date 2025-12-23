@@ -7,6 +7,8 @@ import os
 from src.explain import explain_mutations, explainer
 from src.viz import visualizer
 from src.cache import clear_cache
+from src.sequence_view import render_sequence_html, apply_mutations, generate_fasta, merge_windows
+from src.parsing import Mutation
 from stmol import showmol
 
 # 加载语言文件
@@ -57,6 +59,30 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton,
     [data-testid="stSidebar"] .stSelectbox {
         width: 100% !important;
+    }
+    
+    /* 蛋白质序列显示样式 */
+    .seq-view pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+    }
+    
+    .seq-view .mut {
+        background-color: #ffe08a;
+        border: 1px solid #d4a017;
+        border-radius: 3px;
+        padding: 0 1px;
+        cursor: help;
+    }
+    
+    /* 行首标记样式 */
+    .seq-view strong {
+        color: #666;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -251,22 +277,120 @@ if clicked or "last_result" in st.session_state:
             # 显示序列长度
             st.write(translations["main"]["sequence_length"].format(length=len(result['sequence'])))
             
-            # 显示带有突变标记的序列
+            # 序列显示选项控制
+            col1, col2 = st.columns([2, 3])
+            
+            with col1:
+                # 视图模式选项
+                view_mode = st.radio(
+                    translations["main"]["view_mode"],
+                    [translations["main"]["wt_sequence"], translations["main"]["mut_sequence"], translations["main"]["both_sequences"]],
+                    index=0
+                )
+                
+                # 行长度选项
+                line_length = st.slider(
+                    translations["main"]["line_length"],
+                    min_value=40,
+                    max_value=120,
+                    value=60,
+                    step=5
+                )
+                
+                # 分组显示选项
+                group_by_10 = st.checkbox(
+                    translations["main"]["group_by_10"],
+                    value=True
+                )
+                
+                # 突变窗口选项
+                show_window = st.checkbox(
+                    translations["main"]["show_window"],
+                    value=False
+                )
+                
+                if show_window:
+                    window_size = st.slider(
+                        translations["main"]["window_size"],
+                        min_value=10,
+                        max_value=100,
+                        value=30,
+                        step=5
+                    )
+                else:
+                    window_size = 30
+                
+                # 计算突变窗口
+                mutation_positions = [m.position for m in result["mutations"]]
+                windows = [(pos - window_size, pos + window_size) for pos in mutation_positions]
+                
+                if windows:
+                    merged_windows = merge_windows(windows, gap=window_size//2)
+                    # 确保窗口不超出序列范围
+                    merged_windows = [(max(1, w[0]), min(len(result["sequence"]), w[1])) for w in merged_windows]
+                else:
+                    merged_windows = None
+            
+            # 显示序列
             with st.container(border=True):
                 st.write(translations["main"]["protein_sequence_with_mutations"])
-                marked_sequence = explainer.get_sequence_with_mutations(
-                    result["sequence"], result["mutations"])
                 
-                # 序列显示（每100个氨基酸换行）
-                sequence_display = ""
-                for i in range(0, len(marked_sequence), 100):
-                    chunk = marked_sequence[i:i+100]
-                    # 添加位置标记
-                    start_pos = i + 1
-                    end_pos = min(i + 100, len(result['sequence']))
-                    sequence_display += f"**{start_pos}-{end_pos}:** {chunk}\n\n"
+                if view_mode == translations["main"]["wt_sequence"] or view_mode == translations["main"]["both_sequences"]:
+                    if view_mode == translations["main"]["both_sequences"]:
+                        st.subheader(translations["main"]["wt_sequence"])
+                    
+                    # 渲染野生型序列
+                    for window in merged_windows if show_window and merged_windows else [None]:
+                        html = render_sequence_html(
+                            result["sequence"],
+                            result["mutations"],
+                            line_length=line_length,
+                            group=10 if group_by_10 else 0,
+                            show_ruler=True,
+                            window=window,
+                            mode="wt"
+                        )
+                        st.markdown(html, unsafe_allow_html=True)
                 
-                st.text_area(translations["main"]["protein_sequence"], sequence_display, height=200, label_visibility="collapsed")
+                if view_mode == translations["main"]["mut_sequence"] or view_mode == translations["main"]["both_sequences"]:
+                    if view_mode == translations["main"]["both_sequences"]:
+                        st.subheader(translations["main"]["mut_sequence"])
+                    
+                    # 渲染突变后序列
+                    for window in merged_windows if show_window and merged_windows else [None]:
+                        html = render_sequence_html(
+                            result["sequence"],
+                            result["mutations"],
+                            line_length=line_length,
+                            group=10 if group_by_10 else 0,
+                            show_ruler=True,
+                            window=window,
+                            mode="mut"
+                        )
+                        st.markdown(html, unsafe_allow_html=True)
+            
+            # FASTA下载按钮
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 生成野生型FASTA
+                wt_fasta = generate_fasta(result["sequence"], result["uniprot_id"], result["mutations"], mode="wt")
+                st.download_button(
+                    label=translations["main"]["download_wt_fasta"],
+                    data=wt_fasta,
+                    file_name=f"{result['uniprot_id']}_wt.fasta",
+                    mime="text/fasta"
+                )
+            
+            with col2:
+                # 生成突变后FASTA
+                mut_fasta = generate_fasta(result["sequence"], result["uniprot_id"], result["mutations"], mode="mut")
+                st.download_button(
+                    label=translations["main"]["download_mut_fasta"],
+                    data=mut_fasta,
+                    file_name=f"{result['uniprot_id']}_mut.fasta",
+                    mime="text/fasta"
+                )
         
         # 检查是否有AlphaFold数据
         if result["alphafold_data"] is None:
