@@ -80,7 +80,7 @@ Protein Site Explainer 是一个基于 Streamlit 的交互式工具，用于分�
 ### 1. 克隆仓库
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/fls233666/protein_site_explainer
 cd protein_site_explainer
 ```
 

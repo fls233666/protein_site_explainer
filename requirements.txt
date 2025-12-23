@@ -8,5 +8,14 @@ stmol
 biopython
 scikit-learn
 torch
-esm
+esm==3.2.1.post1
 joblib
+transformers<4.48.2
+tenacity
+altair<7
+cachetools
+click
+pillow
+protobuf
+pyarrow
+watchdog
