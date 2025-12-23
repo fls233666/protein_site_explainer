@@ -439,7 +439,7 @@ if clicked or "last_result" in st.session_state:
                             window=window,
                             mode="wt"
                         )
-                        st.markdown(html, unsafe_allow_html=True)
+                        st.html(html)
                 
                 if view_mode == translations["main"]["mut_sequence"] or view_mode == translations["main"]["both_sequences"]:
                     if view_mode == translations["main"]["both_sequences"]:
@@ -456,7 +456,7 @@ if clicked or "last_result" in st.session_state:
                             window=window,
                             mode="mut"
                         )
-                        st.markdown(html, unsafe_allow_html=True)
+                        st.html(html)
             
             # FASTA下载按钮
             col1, col2 = st.columns(2)
