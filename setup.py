@@ -15,7 +15,7 @@ setup(
         "numpy>=1.24.0",
         "plotly>=5.15.0",
         "py3Dmol==2.0.0.post2",
-        "stmol>=1.0.0",
+        "stmol>=0.0.9",
         "biopython>=1.81",
         "scikit-learn>=1.3.0",
         "torch>=2.0.0",
@@ -25,7 +25,7 @@ setup(
     ],
     extras_require={
         "cpu": [
-            "torch>=2.0.0+cpu",
+            "torch>=2.0.0",
         ],
     },
     author="Your Name",

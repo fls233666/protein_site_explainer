@@ -423,7 +423,7 @@ python -m pytest -m smoke -v
 ### 系统要求
 
 - **操作系统**：Windows 10/11, Linux (Ubuntu 20.04+), MacOS 11+
-- **Python 版本**：3.8 或更高
+- **Python 版本**：3.14 或更高
 - **内存**：建议至少 8GB RAM
 - **存储**：建议至少 5GB 可用磁盘空间（用于缓存和模型）
 - **GPU**：可选，NVIDIA GPU 需支持 CUDA 11.7+（可加速 ESM 模型计算）
