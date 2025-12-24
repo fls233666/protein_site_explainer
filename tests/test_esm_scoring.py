@@ -19,6 +19,9 @@ class TestESMScoring:
         # 20种标准氨基酸
         standard_amino_acids = "ACDEFGHIKLMNPQRSTVWY"
         
+        # 确保模型已加载
+        scorer.load_model()
+        
         for aa in standard_amino_acids:
             assert aa in scorer.alphabet.tok_to_idx, f"Standard amino acid '{aa}' not found in ESM alphabet"
             

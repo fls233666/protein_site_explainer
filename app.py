@@ -4,12 +4,28 @@ import numpy as np
 import requests.exceptions
 import json
 import os
-from src.explain import explain_mutations, explainer
-from src.viz import visualizer
-from src.cache import maybe_reclaim_cache
+import threading
 from src.sequence_view import render_sequence_html, apply_mutations, generate_fasta, merge_windows
 from src.parsing import Mutation
-from stmol import showmol
+
+# 创建按需导入的getter函数
+@st.cache_resource
+def get_explainer():
+    """按需获取解释器实例"""
+    from src.explain import explainer, explain_mutations
+    return explainer, explain_mutations
+
+@st.cache_resource
+def get_visualizer():
+    """按需获取可视化器实例"""
+    from src.viz import visualizer
+    return visualizer
+
+@st.cache_resource
+def get_showmol():
+    """按需获取showmol函数"""
+    from stmol import showmol
+    return showmol
 
 # 加载语言文件
 def load_translations(language):
@@ -42,8 +58,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Lightweight cache maintenance (no-op if executed recently)
-maybe_reclaim_cache()
+# 创建按需导入的缓存维护函数
+@st.cache_resource
+def kick_cache_maintenance():
+    """启动缓存维护的后台线程"""
+    from src.cache import maybe_reclaim_cache
+    # 使用后台线程运行缓存维护，避免阻塞UI
+    thread = threading.Thread(target=maybe_reclaim_cache, daemon=True)
+    thread.start()
+    return "Cache maintenance started"
+
+# 启动缓存维护后台线程
+kick_cache_maintenance()
 
 # 添加自定义CSS使内容区域使用完整宽度
 st.markdown("""
@@ -163,6 +189,7 @@ if clicked or "last_result" in st.session_state:
                 # 使用加载状态
                 with st.spinner(translations["main"]["processing_mutations"]):
                     # 调用解释函数
+                    _, explain_mutations = get_explainer()
                     result = explain_mutations(st.session_state["uniprot_id"], st.session_state["mutation_list_str"], st.session_state["calculate_sensitivity"])
                 
                 # 保存结果到session_state
@@ -225,6 +252,7 @@ if clicked or "last_result" in st.session_state:
         # 2. 序列可视化标签页
         with tabs[1]:
             # 获取pLDDT分布
+            explainer, _ = get_explainer()
             plddt_profile = explainer.get_plddt_profile(result["alphafold_data"])
             
             # 1. 序列特征图
@@ -234,6 +262,7 @@ if clicked or "last_result" in st.session_state:
                 # 绘制序列特征图
                 with st.container(border=True):
                     st.write(translations["main"]["sequence_profile_with_mutations"])
+                    visualizer = get_visualizer()
                     fig = visualizer.plot_sequence_profile(results_df, plddt_profile)
                     st.plotly_chart(fig, width='stretch')
                     
@@ -269,6 +298,7 @@ if clicked or "last_result" in st.session_state:
                 with st.container(border=True):
                     st.write(translations["main"]["alphafold_plddt"])
                     if plddt_profile is not None:
+                        visualizer = get_visualizer()
                         plddt_fig = visualizer.plot_plddt_heatmap(plddt_profile)
                         st.plotly_chart(plddt_fig, width='stretch')
                     else:
@@ -286,6 +316,7 @@ if clicked or "last_result" in st.session_state:
                     from src.alphafold import download_pdb
                     structure_file = download_pdb(uniprot_id)
                     
+                    visualizer = get_visualizer()
                     view = visualizer.create_3d_structure(uniprot_id, result["mutations"], structure_file)
                     
                     if view is None:
@@ -304,6 +335,7 @@ if clicked or "last_result" in st.session_state:
                     else:
                         # 如果有3D结构，正常显示
                         st.write(translations["main"]["interactive_3d_structure"])
+                        showmol = get_showmol()
                         showmol(view, height=600, width=800)
                         
                         # 导出区域

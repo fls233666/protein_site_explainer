@@ -1,5 +1,3 @@
-import plotly.graph_objects as go
-import py3Dmol
 import pandas as pd
 import os
 from .alphafold import download_pdb
@@ -17,6 +15,7 @@ class Visualizer:
         Returns:
             plotly.Figure: 序列特征分布图
         """
+        import plotly.graph_objects as go
         fig = go.Figure()
         
         # 设置x轴范围
@@ -119,6 +118,7 @@ class Visualizer:
             file_format = 'pdb'
 
         # 创建3D视图
+        import py3Dmol
         view = py3Dmol.view(width=width, height=height)
         view.addModel(open(pdb_file, 'r').read(), file_format)
         
@@ -183,6 +183,8 @@ class Visualizer:
         Returns:
             str: 完整的HTML文档
         """
+        # 确保py3Dmol已导入（虽然view已在create_3d_structure中创建，但为了保险添加）
+        import py3Dmol
         fragment = view._make_html()
         return f"""<!doctype html>
 <html lang='en'>
@@ -208,6 +210,7 @@ class Visualizer:
         Returns:
             plotly.Figure: pLDDT热图
         """
+        import plotly.graph_objects as go
         fig = go.Figure(data=go.Heatmap(
             z=[plddt_profile["pLDDT"]],
             x=plddt_profile["Position"],

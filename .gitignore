@@ -46,6 +46,8 @@ Thumbs.db
 *.pdb
 *.pdb.gz
 *.tmp
+*.joblib
+*.pt
 
 # Environment
 .env
