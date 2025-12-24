@@ -27,23 +27,32 @@ class ESMScorer:
                 self.device = "cuda" if torch.cuda.is_available() else "cpu"
                 
             # 加载预训练模型
-            # 兼容ESM 2.x和旧版本的API
+            # 兼容ESM 3.x、2.x和旧版本的API
             try:
-                # ESM 2.x新API：从esm.model_zoo导入
-                from esm.model_zoo import get_pretrained_model
-                self.model, self.alphabet = get_pretrained_model(self.model_name)
-            except ImportError:
-                try:
-                    # 旧API：从esm.pretrained导入
+                # ESM 3.x API：使用load_model_and_alphabet函数
+                if hasattr(esm.pretrained, 'load_model_and_alphabet'):
+                    self.model, self.alphabet = esm.pretrained.load_model_and_alphabet(self.model_name)
+                # ESM 2.x API：从esm.model_zoo导入
+                elif hasattr(esm, 'model_zoo'):
+                    from esm.model_zoo import get_pretrained_model
+                    self.model, self.alphabet = get_pretrained_model(self.model_name)
+                # 旧API：从esm.pretrained导入get_pretrained_model
+                elif hasattr(esm.pretrained, 'get_pretrained_model'):
                     from esm.pretrained import get_pretrained_model
                     self.model, self.alphabet = get_pretrained_model(self.model_name)
-                except ImportError:
-                    # 如果上述方法都失败，尝试直接访问esm.pretrained中的模型函数
-                    if hasattr(esm, 'pretrained') and hasattr(esm.pretrained, self.model_name):
-                        model_func = getattr(esm.pretrained, self.model_name)
-                        self.model, self.alphabet = model_func()
-                    else:
-                        raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version.")
+                # 最旧API：直接访问esm.pretrained中的模型函数
+                elif hasattr(esm.pretrained, self.model_name):
+                    model_func = getattr(esm.pretrained, self.model_name)
+                    self.model, self.alphabet = model_func()
+                else:
+                    raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version.")
+            except (ImportError, AttributeError) as e:
+                # 最后尝试：检查模型名称是否存在于esm.pretrained中
+                if hasattr(esm, 'pretrained') and hasattr(esm.pretrained, self.model_name):
+                    model_func = getattr(esm.pretrained, self.model_name)
+                    self.model, self.alphabet = model_func()
+                else:
+                    raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version. Error: {e}")
             self.model.eval()
             try:
                 self.model = self.model.to(self.device)
