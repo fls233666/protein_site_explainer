@@ -6,7 +6,7 @@ import json
 import os
 from src.explain import explain_mutations, explainer
 from src.viz import visualizer
-from src.cache import clear_cache
+from src.cache import maybe_reclaim_cache
 from src.sequence_view import render_sequence_html, apply_mutations, generate_fasta, merge_windows
 from src.parsing import Mutation
 from stmol import showmol
@@ -41,6 +41,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Lightweight cache maintenance (no-op if executed recently)
+maybe_reclaim_cache()
 
 # 添加自定义CSS使内容区域使用完整宽度
 st.markdown("""
@@ -138,11 +141,6 @@ with st.sidebar:
         help=translations["sidebar"]["calculate_sensitivity_help"],
         key="calculate_sensitivity")
     
-    # 清除缓存按钮
-    st.markdown("---")
-    if st.button(translations["sidebar"]["clear_cache"], type="secondary"):
-        clear_cache()
-        st.success(translations["sidebar"]["cache_cleared"])
 
 # 主内容区域
 st.header(translations["main"]["results"])

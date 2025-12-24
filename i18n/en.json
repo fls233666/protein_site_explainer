@@ -10,8 +10,6 @@
     "advanced_options": "Advanced Options",
     "calculate_sensitivity": "Calculate Site Sensitivity",
     "calculate_sensitivity_help": "Calculate mean sensitivity for all non-wildtype amino acids",
-    "clear_cache": "Clear Cache",
-    "cache_cleared": "Cache cleared successfully!",
     "about": "About",
     "about_content": "Protein Site Explainer analyzes mutations using:\n- ESM-2 language model for LLR calculation\n- AlphaFold for structural confidence (pLDDT)\n- UniProt features mapping\n- 3D structure visualization with py3Dmol",
     "examples": "Examples",

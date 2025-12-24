@@ -59,8 +59,44 @@ def fetch_afdb_predictions(uniprot_id):
             return (None, "AFDB_EMPTY_RESPONSE")
         return (data, None)
     except requests.exceptions.HTTPError as e:
-        # 如果是404错误，返回None和错误原因
+        # 如果是404错误，尝试直接构建最新版本的预测数据
         if e.response.status_code == 404:
+            # 直接构建一个预测条目，使用最新版本号v6
+            latest_version = "v6"
+            entry_id = f"AF-{uniprot_id}-F1"
+            pdb_url = f"https://alphafold.ebi.ac.uk/files/{entry_id}-model_{latest_version}.pdb"
+            
+            # 验证直接URL是否存在，先尝试HEAD请求，如果失败再尝试GET请求
+            url_exists = False
+            try:
+                # 先尝试HEAD请求，轻量级验证
+                response = _session.head(pdb_url, timeout=10)
+                if response.status_code == 200:
+                    url_exists = True
+            except:
+                # HEAD请求失败，尝试GET请求（更可靠但更重）
+                try:
+                    response = _session.get(pdb_url, timeout=10, stream=True)
+                    if response.status_code == 200:
+                        url_exists = True
+                    # 确保关闭连接
+                    response.close()
+                except:
+                    # 如果所有验证都失败，再返回404错误
+                    pass
+            
+            if url_exists:
+                # 如果直接URL存在，构建一个模拟的预测条目
+                mock_prediction = [
+                    {
+                        "entryId": entry_id,
+                        "modelEntityId": uniprot_id,
+                        "pdbUrl": pdb_url,
+                        "cifUrl": pdb_url.replace(".pdb", ".cif")
+                    }
+                ]
+                return (mock_prediction, "AFDB_DIRECT_ACCESS")
+            
             return (None, "AFDB_404")
         # 其他HTTP错误直接抛出原始异常
         raise

@@ -114,27 +114,27 @@ ATOM      6  CA  ALA A   3      12.500  22.500  32.500  1.00  85.00           C
     
     # 模拟fetch_afdb_predictions函数和PDB下载
     with mock.patch('src.alphafold.fetch_afdb_predictions') as mock_fetch_predictions:
-        with mock.patch('src.alphafold._session.get') as mock_get:
-            # 设置fetch_afdb_predictions的返回值
-            mock_fetch_predictions.return_value = [
-                {
-                    "entryId": f"AF-{uniprot_id}-F1",
-                    "modelEntityId": uniprot_id,
-                    "pdbUrl": "https://alphafold.ebi.ac.uk/files/AF-P0DTC2-F1-model_v6.pdb"
-                }
-            ]
-            # 设置_session.get的返回值为PDB响应
-            mock_get.return_value = mock_pdb_response
+            with mock.patch('src.alphafold._session.get') as mock_get:
+                # 设置fetch_afdb_predictions的返回值
+                mock_fetch_predictions.return_value = ([
+                    {
+                        "entryId": f"AF-{uniprot_id}-F1",
+                        "modelEntityId": uniprot_id,
+                        "pdbUrl": "https://alphafold.ebi.ac.uk/files/AF-P0DTC2-F1-model_v6.pdb"
+                    }
+                ], None)
+                # 设置_session.get的返回值为PDB响应
+                mock_get.return_value = mock_pdb_response
+                
+                alphafold_data = get_alphafold_data(uniprot_id)
             
-            alphafold_data = get_alphafold_data(uniprot_id)
-        
-        assert alphafold_data is not None
-        assert alphafold_data.uniprot_id == uniprot_id
-        
-        # 验证pLDDT分数提取
-        assert alphafold_data.get_plddt_at_position(1) == 95.0
-        assert alphafold_data.get_plddt_at_position(2) == 90.0
-        assert alphafold_data.get_plddt_at_position(3) == 85.0
+            assert alphafold_data is not None
+            assert alphafold_data.uniprot_id == uniprot_id
+            
+            # 验证pLDDT分数提取
+            assert alphafold_data.get_plddt_at_position(1) == 95.0
+            assert alphafold_data.get_plddt_at_position(2) == 90.0
+            assert alphafold_data.get_plddt_at_position(3) == 85.0
 
 
 def test_download_pdb():
@@ -157,7 +157,7 @@ ATOM      2  CA  ALA A   1      10.500  20.500  30.500  1.00  95.00           C
     
     # 创建临时目录
     with tempfile.TemporaryDirectory() as temp_dir:
-        # 模拟fetch_afdb_predictions函数和_session.get
+        # 模拟fetch_afdb_predictions函数、_session.get
         with mock.patch('src.alphafold.fetch_afdb_predictions') as mock_fetch:
             with mock.patch('src.alphafold._session.get') as mock_get:
                 # 设置fetch_afdb_predictions的返回值
@@ -174,14 +174,29 @@ ATOM      2  CA  ALA A   1      10.500  20.500  30.500  1.00  95.00           C
                 # 设置_session.get的返回值
                 mock_get.return_value = mock_pdb_response
                 
-                pdb_path = download_pdb(uniprot_id, save_dir=temp_dir)
+                # 为os.path.exists创建一个更精细的模拟，只在检查本地文件时返回False
+                def mock_exists(path):
+                    # 检查是否是检查本地模型文件的路径
+                    if path.startswith(os.path.join(os.getcwd(), "models")):
+                        return False  # 确保没有本地模型文件
+                    if path.startswith(os.environ.get("ALPHAFOLD_LOCAL_DIR", "")):
+                        return False  # 确保没有ALPHAFOLD_LOCAL_DIR中的文件
+                    # 对于其他路径，使用真实的os.path.exists
+                    return real_os_path_exists(path)
                 
-                # 验证文件创建
-                assert os.path.exists(pdb_path)
-                assert os.path.basename(pdb_path) == "AF-P0DTC2-F1-model_v6.pdb"
+                # 保存真实的os.path.exists函数
+                real_os_path_exists = os.path.exists
                 
-                # 验证文件内容
-                with open(pdb_path, 'r') as f:
-                    content = f.read()
-                    assert "ATOM      1  N   ALA A   1" in content
-                    assert "95.00" in content
+                # 使用side_effect来模拟os.path.exists
+                with mock.patch('os.path.exists', side_effect=mock_exists):
+                    pdb_path = download_pdb(uniprot_id, save_dir=temp_dir)
+                    
+                    # 验证文件创建 - 这里使用真实的os.path.exists
+                    assert real_os_path_exists(pdb_path)
+                    assert os.path.basename(pdb_path) == "AF-P0DTC2-F1-model_v6.pdb"
+                    
+                    # 验证文件内容
+                    with open(pdb_path, 'r') as f:
+                        content = f.read()
+                        assert "ATOM      1  N   ALA A   1" in content
+                        assert "95.00" in content

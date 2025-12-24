@@ -10,8 +10,6 @@
     "advanced_options": "高级选项",
     "calculate_sensitivity": "计算位点敏感度",
     "calculate_sensitivity_help": "计算所有非野生型氨基酸的平均敏感度",
-    "clear_cache": "清除缓存",
-    "cache_cleared": "缓存已成功清除！",
     "about": "关于",
     "about_content": "蛋白质位点解释器使用以下工具分析突变：\n- ESM-2语言模型计算LLR\n- AlphaFold提供结构置信度(pLDDT)\n- UniProt功能映射\n- py3Dmol进行3D结构可视化",
     "examples": "示例",
