@@ -89,7 +89,7 @@ cd protein_site_explainer
 #### Linux/Mac
 ```bash
 # 使用 conda
-conda create -n protein_explainer python=3.8
+conda create -n protein_explainer python=3.14
 conda activate protein_explainer
 
 # 或者使用 venv
@@ -100,7 +100,7 @@ source venv/bin/activate
 #### Windows
 ```bash
 # 使用 conda
-conda create -n protein_explainer python=3.8
+conda create -n protein_explainer python=3.14
 conda activate protein_explainer
 
 # 或者使用 venv
