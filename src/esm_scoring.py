@@ -29,30 +29,42 @@ class ESMScorer:
             # 加载预训练模型
             # 兼容ESM 3.x、2.x和旧版本的API
             try:
-                # ESM 3.x API：使用load_model_and_alphabet函数
-                if hasattr(esm.pretrained, 'load_model_and_alphabet'):
-                    self.model, self.alphabet = esm.pretrained.load_model_and_alphabet(self.model_name)
-                # ESM 2.x API：从esm.model_zoo导入
-                elif hasattr(esm, 'model_zoo'):
-                    from esm.model_zoo import get_pretrained_model
-                    self.model, self.alphabet = get_pretrained_model(self.model_name)
-                # 旧API：从esm.pretrained导入get_pretrained_model
-                elif hasattr(esm.pretrained, 'get_pretrained_model'):
-                    from esm.pretrained import get_pretrained_model
-                    self.model, self.alphabet = get_pretrained_model(self.model_name)
-                # 最旧API：直接访问esm.pretrained中的模型函数
-                elif hasattr(esm.pretrained, self.model_name):
-                    model_func = getattr(esm.pretrained, self.model_name)
-                    self.model, self.alphabet = model_func()
-                else:
-                    raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version.")
-            except (ImportError, AttributeError) as e:
-                # 最后尝试：检查模型名称是否存在于esm.pretrained中
-                if hasattr(esm, 'pretrained') and hasattr(esm.pretrained, self.model_name):
-                    model_func = getattr(esm.pretrained, self.model_name)
-                    self.model, self.alphabet = model_func()
-                else:
-                    raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version. Error: {e}")
+                # 首先尝试直接使用esm.pretrained.load_model_and_alphabet（这是ESM 3.x的标准API）
+                self.model, self.alphabet = esm.pretrained.load_model_and_alphabet(self.model_name)
+            except Exception as e1:
+                try:
+                    # ESM 2.x API：从esm.model_zoo导入
+                    if hasattr(esm, 'model_zoo'):
+                        from esm.model_zoo import get_pretrained_model
+                        self.model, self.alphabet = get_pretrained_model(self.model_name)
+                    else:
+                        raise ValueError(f"Could not load model '{self.model_name}'. ESM version not compatible.")
+                except Exception as e2:
+                    try:
+                        # 旧API：从esm.pretrained导入get_pretrained_model
+                        if hasattr(esm.pretrained, 'get_pretrained_model'):
+                            from esm.pretrained import get_pretrained_model
+                            self.model, self.alphabet = get_pretrained_model(self.model_name)
+                        else:
+                            raise ValueError(f"Could not load model '{self.model_name}'. ESM version not compatible.")
+                    except Exception as e3:
+                        try:
+                            # 最旧API：直接访问esm.pretrained中的模型函数
+                            if hasattr(esm.pretrained, self.model_name):
+                                model_func = getattr(esm.pretrained, self.model_name)
+                                self.model, self.alphabet = model_func()
+                            else:
+                                raise ValueError(f"Could not load model '{self.model_name}'. Model name not found in esm.pretrained.")
+                        except Exception as e4:
+                            raise ValueError(
+                                f"Could not load model '{self.model_name}' with any API. "
+                                f"ESM version: {esm.__version__}\n"  # 添加ESM版本信息
+                                f"API attempts failed with errors:\n"  # 添加详细错误信息
+                                f"1. load_model_and_alphabet: {e1}\n"  # 第一个API尝试的错误
+                                f"2. model_zoo.get_pretrained_model: {e2}\n"  # 第二个API尝试的错误
+                                f"3. pretrained.get_pretrained_model: {e3}\n"  # 第三个API尝试的错误
+                                f"4. direct model function call: {e4}\n"  # 第四个API尝试的错误
+                            )
             self.model.eval()
             try:
                 self.model = self.model.to(self.device)
