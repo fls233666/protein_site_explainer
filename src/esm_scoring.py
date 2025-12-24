@@ -27,8 +27,23 @@ class ESMScorer:
                 self.device = "cuda" if torch.cuda.is_available() else "cpu"
                 
             # 加载预训练模型
-            model_func = getattr(esm.pretrained, self.model_name)
-            self.model, self.alphabet = model_func()
+            # 兼容ESM 2.x和旧版本的API
+            try:
+                # ESM 2.x新API：从esm.model_zoo导入
+                from esm.model_zoo import get_pretrained_model
+                self.model, self.alphabet = get_pretrained_model(self.model_name)
+            except ImportError:
+                try:
+                    # 旧API：从esm.pretrained导入
+                    from esm.pretrained import get_pretrained_model
+                    self.model, self.alphabet = get_pretrained_model(self.model_name)
+                except ImportError:
+                    # 如果上述方法都失败，尝试直接访问esm.pretrained中的模型函数
+                    if hasattr(esm, 'pretrained') and hasattr(esm.pretrained, self.model_name):
+                        model_func = getattr(esm.pretrained, self.model_name)
+                        self.model, self.alphabet = model_func()
+                    else:
+                        raise ValueError(f"Could not load model '{self.model_name}'. Please check the model name and ESM version.")
             self.model.eval()
             try:
                 self.model = self.model.to(self.device)

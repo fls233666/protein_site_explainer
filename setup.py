@@ -6,8 +6,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="protein_site_explainer",
     version="0.1.0",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=["src"],
+    package_dir={"src": "src"},
     install_requires=[
         "streamlit>=1.20.0",
         "requests>=2.31.0",

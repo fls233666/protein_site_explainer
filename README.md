@@ -140,6 +140,46 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+## 常见问题与解决方案
+
+### Linux/Mac 环境下 "ModuleNotFoundError: No module named 'src'" 错误
+
+在 Linux/Mac 环境下运行测试时，可能会遇到 `ModuleNotFoundError: No module named 'src'` 错误。这是因为 Python 无法在这些平台上自动找到项目的 `src` 目录。
+
+#### 解决方案 1：使用开发模式安装（推荐）
+
+最可靠的解决方法是使用开发模式安装包：
+
+```bash
+pip install -e .
+```
+
+这会将项目添加到 Python 的包路径中，使所有模块都能被正确导入。
+
+#### 解决方案 2：手动设置 Python 路径
+
+如果不想安装包，可以在运行测试前手动设置 Python 路径：
+
+```bash
+export PYTHONPATH=$(pwd)
+python -m pytest
+```
+
+或者运行提供的环境设置脚本：
+
+```bash
+python setup_env.py
+python -m pytest
+```
+
+#### 解决方案 3：使用测试配置文件
+
+项目已包含 `tests/conftest.py` 文件，该文件会自动设置 Python 路径。确保您使用 pytest 运行测试：
+
+```bash
+python -m pytest
+```
+
 ## 运行方法
 
 ### Linux/Mac
@@ -307,7 +347,7 @@ protein_site_explainer/
 
 ```bash
 # Linux/Mac
-pytest
+python -m pytest
 
 # Windows
 python -m pytest
