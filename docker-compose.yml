@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - "./.cache:/app/.cache"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8501/_stcore/health"]
+      interval: 30s
+      timeout: 30s
+      start_period: 5s
+      retries: 3
+
+  gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    ports:
+      - "8501:8501"
+    volumes:
+      - "./.cache:/app/.cache"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8501/_stcore/health"]
+      interval: 30s
+      timeout: 30s
+      start_period: 5s
+      retries: 3
