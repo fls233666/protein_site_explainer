@@ -93,7 +93,7 @@ conda create -n protein_explainer python=3.14
 conda activate protein_explainer
 
 # 或者使用 venv
-python -m venv venv
+python3.14 -m venv venv
 source venv/bin/activate
 ```
 

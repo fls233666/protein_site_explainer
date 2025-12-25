@@ -21,50 +21,74 @@ class ESMScorer:
             # 延迟导入torch和esm
             import torch
             import esm
+            import importlib.metadata
             
             # 初始化设备
             if self.device is None:
                 self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            
+            # 依赖自检：检查安装的是哪个esm发行包
+            try:
+                # 尝试获取安装的esm包信息
+                esm_dist = importlib.metadata.distribution('esm')
+                if self.model_name.startswith('esm2_'):
+                    raise ValueError(
+                        f"Found installed package 'esm' (version {esm_dist.version}), but '{self.model_name}' requires FAIR-ESM2.\n" +
+                        "Please uninstall 'esm' (ESM3/ESMC) and install 'fair-esm' instead:\n" +
+                        "pip uninstall -y esm && pip install -U fair-esm"
+                    )
+            except importlib.metadata.PackageNotFoundError:
+                # esm包未安装，尝试检查fair-esm包
+                try:
+                    fair_esm_dist = importlib.metadata.distribution('fair-esm')
+                except importlib.metadata.PackageNotFoundError:
+                    # 都没安装，让后面的导入错误来处理
+                    pass
                 
             # 加载预训练模型
-            # 兼容ESM 3.x、2.x和旧版本的API
             try:
-                # 首先尝试直接使用esm.pretrained.load_model_and_alphabet（这是ESM 3.x的标准API）
-                self.model, self.alphabet = esm.pretrained.load_model_and_alphabet(self.model_name)
+                # 优先走FAIR-ESM2标准：直接从esm.pretrained导入load_model_and_alphabet
+                from esm.pretrained import load_model_and_alphabet
+                self.model, self.alphabet = load_model_and_alphabet(self.model_name)
             except Exception as e1:
+                # 其次走函数式：直接从esm.pretrained调用模型函数
                 try:
-                    # ESM 2.x API：从esm.model_zoo导入
-                    if hasattr(esm, 'model_zoo'):
-                        from esm.model_zoo import get_pretrained_model
-                        self.model, self.alphabet = get_pretrained_model(self.model_name)
+                    from esm import pretrained
+                    if hasattr(pretrained, self.model_name):
+                        model_func = getattr(pretrained, self.model_name)
+                        self.model, self.alphabet = model_func()
                     else:
-                        raise ValueError(f"Could not load model '{self.model_name}'. ESM version not compatible.")
+                        raise ValueError(f"Model function '{self.model_name}' not found in esm.pretrained")
                 except Exception as e2:
+                    # 尝试直接使用esm.pretrained模型函数
                     try:
-                        # 旧API：从esm.pretrained导入get_pretrained_model
-                        if hasattr(esm.pretrained, 'get_pretrained_model'):
-                            from esm.pretrained import get_pretrained_model
-                            self.model, self.alphabet = get_pretrained_model(self.model_name)
+                        if hasattr(esm, 'pretrained') and hasattr(esm.pretrained, self.model_name):
+                            model_func = getattr(esm.pretrained, self.model_name)
+                            self.model, self.alphabet = model_func()
                         else:
-                            raise ValueError(f"Could not load model '{self.model_name}'. ESM version not compatible.")
+                            raise ValueError(f"Could not load model '{self.model_name}'.")
                     except Exception as e3:
+                        # 收集调试信息
+                        package_info = ""
                         try:
-                            # 最旧API：直接访问esm.pretrained中的模型函数
-                            if hasattr(esm.pretrained, self.model_name):
-                                model_func = getattr(esm.pretrained, self.model_name)
-                                self.model, self.alphabet = model_func()
-                            else:
-                                raise ValueError(f"Could not load model '{self.model_name}'. Model name not found in esm.pretrained.")
-                        except Exception as e4:
-                            raise ValueError(
-                                f"Could not load model '{self.model_name}' with any API. "
-                                f"ESM version: {esm.__version__}\n"  # 添加ESM版本信息
-                                f"API attempts failed with errors:\n"  # 添加详细错误信息
-                                f"1. load_model_and_alphabet: {e1}\n"  # 第一个API尝试的错误
-                                f"2. model_zoo.get_pretrained_model: {e2}\n"  # 第二个API尝试的错误
-                                f"3. pretrained.get_pretrained_model: {e3}\n"  # 第三个API尝试的错误
-                                f"4. direct model function call: {e4}\n"  # 第四个API尝试的错误
-                            )
+                            fair_esm_dist = importlib.metadata.distribution('fair-esm')
+                            package_info = f"Installed fair-esm version: {fair_esm_dist.version}\n"
+                        except importlib.metadata.PackageNotFoundError:
+                            try:
+                                esm_dist = importlib.metadata.distribution('esm')
+                                package_info = f"Installed esm version: {esm_dist.version}\n"
+                            except importlib.metadata.PackageNotFoundError:
+                                package_info = "No esm or fair-esm package found installed\n"
+                        
+                        raise ValueError(
+                            f"Could not load model '{self.model_name}' with any API.\n"  # 基本错误信息
+                            f"{package_info}"  # 包信息
+                            f"ESM module location: {esm.__file__ if hasattr(esm, '__file__') else 'None'}\n"  # ESM模块位置
+                            f"API attempts failed with errors:\n"  # 详细错误信息
+                            f"1. FAIR-ESM2 standard (from esm.pretrained import load_model_and_alphabet): {e1}\n"  # 第一个API尝试的错误
+                            f"2. Functional call (from esm import pretrained): {e2}\n"  # 第二个API尝试的错误
+                            f"3. Direct pretrained attribute: {e3}\n"  # 第三个API尝试的错误
+                        )
             self.model.eval()
             try:
                 self.model = self.model.to(self.device)
@@ -86,9 +110,6 @@ class ESMScorer:
         Returns:
             numpy array: 形状为 (sequence_length, num_tokens) 的logits矩阵
         """
-        # 确保模型已加载
-        self.load_model()
-        
         # 验证序列（允许<mask>标记）
         if '<mask>' in sequence:
             # 分割并验证每个部分
@@ -102,6 +123,9 @@ class ESMScorer:
             for aa in sequence:
                 if aa not in STANDARD_AMINO_ACIDS:
                     raise ValueError(f"Non-standard amino acid '{aa}' found in sequence")
+        
+        # 确保模型已加载
+        self.load_model()
         
         # 准备输入
         data = [("protein", sequence)]
@@ -144,9 +168,6 @@ class ESMScorer:
         Returns:
             float: LLR值 (logP(mut) - logP(wt))
         """
-        # 确保模型已加载
-        self.load_model()
-        
         # 验证氨基酸
         if wt_aa not in STANDARD_AMINO_ACIDS:
             raise ValueError(f"Wildtype amino acid '{wt_aa}' is not a standard amino acid")
@@ -158,6 +179,9 @@ class ESMScorer:
             raise ValueError(f"Position {position} is out of sequence bounds (1-{len(sequence)})")
         if sequence[position - 1] != wt_aa:
             raise ValueError(f"Sequence at position {position} is '{sequence[position - 1]}', expected wildtype '{wt_aa}'")
+        
+        # 确保模型已加载
+        self.load_model()
         
         # 创建mask序列
         mask_sequence = list(sequence)
@@ -194,9 +218,6 @@ class ESMScorer:
         Returns:
             float: 敏感度值 (mean_{aa!=wt}(logP(aa) - logP(wt)))
         """
-        # 确保模型已加载
-        self.load_model()
-        
         if full_length:
             raise NotImplementedError("Full length sensitivity calculation not implemented yet")
         
@@ -209,6 +230,9 @@ class ESMScorer:
             raise ValueError(f"Position {position} is out of sequence bounds (1-{len(sequence)})")
         if sequence[position - 1] != wt_aa:
             raise ValueError(f"Sequence at position {position} is '{sequence[position - 1]}', expected wildtype '{wt_aa}'")
+        
+        # 确保模型已加载
+        self.load_model()
         
         # 创建mask序列
         mask_sequence = list(sequence)
@@ -255,9 +279,6 @@ class ESMScorer:
         Returns:
             list of dict: 每个突变的评分结果
         """
-        # 确保模型已加载
-        self.load_model()
-        
         # 验证所有突变的氨基酸和位置
         for mutation in mutations:
             if mutation.wt_aa not in STANDARD_AMINO_ACIDS:
@@ -268,6 +289,9 @@ class ESMScorer:
                 raise ValueError(f"Position {mutation.position} is out of sequence bounds (1-{len(sequence)})")
             if sequence[mutation.position - 1] != mutation.wt_aa:
                 raise ValueError(f"Mutation {mutation} wildtype mismatch: expected {sequence[mutation.position - 1]}, got {mutation.wt_aa}")
+        
+        # 确保模型已加载
+        self.load_model()
         
         results = []
         
